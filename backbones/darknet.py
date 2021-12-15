@@ -4,6 +4,15 @@ from torch import nn
 from .base import BaseBackbone
 from .components import ConvBnAct
 
+__all__ = [
+    "Darknet",
+    "CSPDarknet",
+    "darknet19",
+    "darknet53",
+    "cspdarknet19",
+    "cspdarknet53"
+]
+
 configs = {
     "darknet-19": {
         "stem_channels": 32,
@@ -74,9 +83,6 @@ class Darknet(BaseBackbone):
             new_stage = DarknetStage(n, in_channels, c)
             self.stages.append(new_stage)
             in_channels = c
-
-    def forward(self, x):
-        return self.forward_features(x)[-1]
 
     def forward_features(self, x):
         outputs = []

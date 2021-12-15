@@ -5,6 +5,9 @@ import torch
 from torch import nn
 
 class BaseBackbone(nn.Module, metaclass=ABCMeta):
+    def forward(self, x):
+        return self.forward_features(x)[-1]
+
     @abstractmethod
     def forward_features(self, x: torch.Tensor) -> Tuple[torch.Tensor]:
         pass
