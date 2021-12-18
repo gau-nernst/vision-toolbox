@@ -1,2 +1,2 @@
-from darknet import *
-from vovnet import *
+from .darknet import *
+from .vovnet import *
