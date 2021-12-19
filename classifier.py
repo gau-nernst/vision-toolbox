@@ -53,17 +53,18 @@ class ImageClassifier(pl.LightningModule):
         norm_weight_decay: float=0,
         label_smoothing: float=0.1,
         warmup_epochs: int=5,
-        warmup_decay: float=0.01
+        warmup_decay: float=0.01,
+
+        # others
+        jit: bool=True
         ):
         super().__init__()
-        backbone = backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
-        classifier = nn.Sequential(
+        self.backbone = backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
+        self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((1,1)),
             nn.Flatten(),
-            nn.Linear(backbone.get_out_channels()[-1], num_classes)
+            nn.Linear(self.backbone.get_out_channels()[-1], num_classes)
         )
-        self.backbone = torch.jit.script(backbone)
-        self.classifier = torch.jit.script(classifier)
 
         train_transforms = [
             T.RandomHorizontalFlip(),
@@ -74,11 +75,15 @@ class ImageClassifier(pl.LightningModule):
         if random_erasing_p > 0:
             train_transforms.append(T.RandomErasing(p=random_erasing_p, value="random"))
         
-        train_transforms = nn.Sequential(*train_transforms)
-        self.train_transforms = torch.jit.script(train_transforms)
+        self.train_transforms = nn.Sequential(*train_transforms)
+        self.mixup_cutmix = RandomCutMixMixUp(num_classes, cutmix_alpha, mixup_alpha) if cutmix_alpha > 0 and mixup_alpha > 0 else None
 
-        mixup_cutmix = RandomCutMixMixUp(num_classes, cutmix_alpha, mixup_alpha) if cutmix_alpha > 0 and mixup_alpha > 0 else None
-        self.mixup_cutmix = torch.jit.script(mixup_cutmix) if mixup_cutmix is not None else None
+        if jit:
+            self.backbone = torch.jit.script(self.backbone)
+            self.classifier = torch.jit.script(self.classifier)
+            self.train_transforms = torch.jit.script(self.train_transforms)
+            if self.mixup_cutmix is not None:
+                self.mixup_cutmix = torch.jit.script(self.mixup_cutmix)
 
         self.save_hyperparameters()
 
@@ -116,8 +121,8 @@ class ImageClassifier(pl.LightningModule):
             images, labels = self.mixup_cutmix(images, labels)
 
         logits = self(images)
-        loss = F.cross_entropy(logits, labels)
-        self.log("train/loss", loss)
+        loss = F.cross_entropy(logits, labels, label_smoothing=self.hparams.label_smoothing)
+        self.log("train/loss", loss, sync_dist=True)
         
         return loss
 
@@ -125,13 +130,13 @@ class ImageClassifier(pl.LightningModule):
         images, labels = batch
 
         logits = self(images)
-        loss = F.cross_entropy(logits, labels, label_smoothing=self.hparams.label_smoothing)
-        self.log("val/loss", loss)
+        loss = F.cross_entropy(logits, labels)
+        self.log("val/loss", loss, sync_dist=True)
 
         preds = torch.argmax(logits, dim=-1)
         correct = (labels == preds).sum()
         acc = correct / labels.numel()
-        self.log("val/acc", acc)
+        self.log("val/acc", acc, sync_dist=True)
 
     def configure_optimizers(self):
         if self.hparams.norm_weight_decay is not None:
@@ -160,7 +165,7 @@ class ImageClassifier(pl.LightningModule):
         lr_scheduler = CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs-self.hparams.warmup_epochs)
         if self.hparams.warmup_epochs > 0:
             warmup_scheduler = LinearLR(optimizer, start_factor=self.hparams.warmup_decay, total_iters=self.hparams.warmup_epochs)
-            lr_scheduler = SequentialLR(optimizer, schedulers=[lr_scheduler, warmup_scheduler], milestones=[self.hparams.warmup_epochs])
+            lr_scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, lr_scheduler], milestones=[self.hparams.warmup_epochs])
             
             # https://github.com/pytorch/pytorch/issues/67318
             if not hasattr(lr_scheduler, "optimizer"):
