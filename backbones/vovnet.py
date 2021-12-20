@@ -1,8 +1,13 @@
+# Papers:
+# https://arxiv.org/abs/1904.09730
+# https://arxiv.org/abs/1911.06667
+
 import torch
 from torch import nn
 
 from .base import BaseBackbone
-from .components import ConvBnAct
+from .components import ConvBnAct, ESEBlock
+
 
 __all__ = [
     "VoVNet",
@@ -44,12 +49,16 @@ configs = {
     }
 }
 
+
 class OSABlock(nn.Module):
-    def __init__(self, in_channels, mid_channels, num_layers, out_channels):
+    def __init__(self, in_channels, mid_channels, num_layers, out_channels, residual=True, ese=True):
         super().__init__()
         self.convs = nn.ModuleList([ConvBnAct(in_channels if i == 0 else mid_channels, mid_channels) for i in range(num_layers)])
         concat_channels = in_channels + mid_channels * num_layers
         self.out_conv = ConvBnAct(concat_channels, out_channels, kernel_size=1, padding=0)
+
+        self.ese = ESEBlock(out_channels) if ese else None
+        self.residual = residual and (in_channels == out_channels)
 
     def forward(self, x):
         outputs = []
@@ -61,18 +70,27 @@ class OSABlock(nn.Module):
 
         out = torch.concat(outputs, dim=1)
         out = self.out_conv(out)
+        
+        if self.ese is not None:
+            out = self.ese(out)
+        if self.residual:
+            out = out + x
+
         return out
 
+
 class OSAStage(nn.Sequential):
-    def __init__(self, n, in_channels, stage_channels, num_layers, out_channels):
+    def __init__(self, num_blocks, in_channels, stage_channels, num_layers, out_channels, residual=True, ese=True):
         super().__init__()
         self.max_pool = nn.MaxPool2d(3, 2, padding=1)
-        self.module_0 = OSABlock(in_channels, stage_channels, num_layers, out_channels)
-        for i in range(1, n):
-            self.add_module(f"module_{i}", OSABlock(out_channels, stage_channels, num_layers, out_channels))
+        self.module_0 = OSABlock(in_channels, stage_channels, num_layers, out_channels, residual=False, ese=ese)
+        for i in range(1, num_blocks):
+            self.add_module(f"module_{i}", OSABlock(out_channels, stage_channels, num_layers, out_channels, residual=residual, ese=ese))
+
 
 class VoVNet(BaseBackbone):
-    def __init__(self, stem_channels, num_blocks, stage_channels, num_layers, out_channels):
+    # to make VoVNetV1, pass residual=False and ese=False
+    def __init__(self, stem_channels, num_blocks, stage_channels, num_layers, out_channels, residual=True, ese=True):
         super().__init__()
         self.out_channels = tuple(out_channels)
         self.stem = nn.Sequential()
@@ -83,7 +101,7 @@ class VoVNet(BaseBackbone):
         
         self.stages = nn.ModuleList()
         for n, stage_c, n_l, out_c in zip(num_blocks, stage_channels, num_layers, out_channels):
-            self.stages.append(OSAStage(n, in_channels, stage_c, n_l, out_c))
+            self.stages.append(OSAStage(n, in_channels, stage_c, n_l, out_c, residual=residual, ese=ese))
             in_channels = out_c
 
     def forward_features(self, x):
@@ -96,17 +114,8 @@ class VoVNet(BaseBackbone):
 
         return outputs
 
-    def get_out_channels(self):
-        return self.out_channels
 
-def vovnet19_slim():
-    return VoVNet(**configs["vovnet-19-slim"])
-
-def vovnet39():
-    return VoVNet(**configs["vovnet-39"])
-
-def vovnet57():
-    return VoVNet(**configs["vovnet-57"])
-
-def vovnet99():
-    return VoVNet(**configs["vovnet-99"])
+def vovnet19_slim(): return VoVNet(**configs["vovnet-19-slim"])
+def vovnet39(): return VoVNet(**configs["vovnet-39"])
+def vovnet57(): return VoVNet(**configs["vovnet-57"])
+def vovnet99(): return VoVNet(**configs["vovnet-99"])

@@ -4,6 +4,7 @@ from torch import nn
 from .base import BaseBackbone
 from .components import ConvBnAct
 
+
 __all__ = [
     "Darknet",
     "CSPDarknet",
@@ -26,6 +27,7 @@ configs = {
     }
 }
 
+
 class DarknetBlock(nn.Module):
     def __init__(self, in_channels, expansion=0.5):
         super().__init__()
@@ -38,6 +40,7 @@ class DarknetBlock(nn.Module):
         out = self.conv2(out)
         return x + out
 
+
 class DarknetStage(nn.Module):
     def __init__(self, n, in_channels, out_channels):
         super().__init__()
@@ -48,6 +51,7 @@ class DarknetStage(nn.Module):
         out = self.conv(x)
         out = self.blocks(out)
         return out
+
 
 class CSPDarknetStage(nn.Module):
     def __init__(self, n, in_channels, out_channels):
@@ -71,10 +75,11 @@ class CSPDarknetStage(nn.Module):
         out = self.out_conv(out)
         return out
 
+
 class Darknet(BaseBackbone):
     def __init__(self, stem_channels, num_blocks, num_channels):
         super().__init__()
-        self.num_channels = tuple(num_channels)
+        self.out_channels = tuple(num_channels)
         self.stem = ConvBnAct(3, stem_channels)
         
         self.stages = nn.ModuleList()
@@ -93,8 +98,6 @@ class Darknet(BaseBackbone):
 
         return outputs
 
-    def get_out_channels(self):
-        return self.num_channels
 
 class CSPDarknet(Darknet):
     def __init__(self, stem_channels, num_blocks, num_channels):
@@ -109,14 +112,8 @@ class CSPDarknet(Darknet):
             self.stages.append(new_stage)
             in_channels = c
 
-def darknet19():
-    return Darknet(**configs["darknet-19"])
 
-def darknet53():
-    return Darknet(**configs["darknet-53"])
-
-def cspdarknet19():
-    return CSPDarknet(**configs["darknet-19"])
-
-def cspdarknet53():
-    return CSPDarknet(**configs["darknet-53"])
+def darknet19(): return Darknet(**configs["darknet-19"])
+def darknet53(): return Darknet(**configs["darknet-53"])
+def cspdarknet19(): return CSPDarknet(**configs["darknet-19"])
+def cspdarknet53(): return CSPDarknet(**configs["darknet-53"])

@@ -12,6 +12,5 @@ class BaseBackbone(nn.Module, metaclass=ABCMeta):
     def forward_features(self, x: torch.Tensor) -> Tuple[torch.Tensor]:
         pass
 
-    @abstractmethod
     def get_out_channels(self) -> Tuple[int]:
-        pass
+        return self.out_channels
