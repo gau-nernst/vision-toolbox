@@ -1,13 +1,18 @@
 # Vision Backbones
 
+Implemented backbones:
+
+- [Darknet](#darknet)
+- [VoVNet](#vovnet)
+
 ## ImageNet
 
 Download ImageNet Challenge here: https://www.kaggle.com/c/imagenet-object-localization-challenge/
 
 ```
 unzip imagenet-object-localization-challenge
-tar -xf imagenet-object-localization-challenge
-python ./scripts/imagenet.py --val_solution_path ./ILRSC/val... ./ILRSC/Images/val
+tar -xf imagenet-object-localization-challenge -C ImageNet
+python ./scripts/imagenet.py --val_solution_path ./ImageNet/LOC_val_solution.csv --val_image_dir ./ImageNet/ILSVRC/Data/CLS-LOC/val
 ```
 
 Reference training recipe:
@@ -15,10 +20,13 @@ Reference training recipe:
 - https://github.com/pytorch/vision/blob/main/references/classification/train.py
 - https://pytorch.org/blog/how-to-train-state-of-the-art-models-using-torchvision-latest-primitives/
 
-Implemented backbones:
+Training tricks from torchvision's recipe:
 
-- Darknet
-- VoVNet
+- LR schedule: linear warmup with cosine annealing
+- Label smoothing
+- Augmentations: Trivial Augmentation, Randome Erasing, CutMix, and MixUp
+- FixRes
+- Model EMA (not implemented)
 
 ## Darknet
 

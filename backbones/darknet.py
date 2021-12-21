@@ -1,3 +1,8 @@
+# Papers
+# https://arxiv.org/abs/1612.08242
+# https://arxiv.org/abs/1804.02767
+# https://openaccess.thecvf.com/content_CVPRW_2020/papers/w28/Wang_CSPNet_A_New_Backbone_That_Can_Enhance_Learning_Capability_of_CVPRW_2020_paper.pdf
+
 import torch
 from torch import nn
 
@@ -6,12 +11,9 @@ from .components import ConvBnAct
 
 
 __all__ = [
-    "Darknet",
-    "CSPDarknet",
-    "darknet19",
-    "darknet53",
-    "cspdarknet19",
-    "cspdarknet53"
+    "Darknet", "CSPDarknet",
+    "darknet19", "darknet53",
+    "cspdarknet19", "cspdarknet53"
 ]
 
 configs = {
@@ -102,7 +104,7 @@ class Darknet(BaseBackbone):
 class CSPDarknet(Darknet):
     def __init__(self, stem_channels, num_blocks, num_channels):
         nn.Module.__init__(self)
-        self.num_channels = tuple(num_channels)
+        self.out_channels = tuple(num_channels)
         self.stem = ConvBnAct(3, stem_channels)
 
         self.stages = nn.ModuleList()

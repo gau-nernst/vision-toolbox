@@ -11,10 +11,8 @@ from .components import ConvBnAct, ESEBlock
 
 __all__ = [
     "VoVNet",
-    "vovnet19_slim",
-    "vovnet39",
-    "vovnet57",
-    "vovnet99"
+    "vovnet19_slim", "vovnet39",
+    "vovnet57", "vovnet99"
 ]
 
 # https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py
@@ -115,7 +113,7 @@ class VoVNet(BaseBackbone):
         return outputs
 
 
-def vovnet19_slim(): return VoVNet(**configs["vovnet-19-slim"])
-def vovnet39(): return VoVNet(**configs["vovnet-39"])
-def vovnet57(): return VoVNet(**configs["vovnet-57"])
-def vovnet99(): return VoVNet(**configs["vovnet-99"])
+def vovnet19_slim(**kwargs): return VoVNet(**configs["vovnet-19-slim"], **kwargs)
+def vovnet39(**kwargs): return VoVNet(**configs["vovnet-39"], **kwargs)
+def vovnet57(**kwargs): return VoVNet(**configs["vovnet-57"], **kwargs)
+def vovnet99(**kwargs): return VoVNet(**configs["vovnet-99"], **kwargs)
