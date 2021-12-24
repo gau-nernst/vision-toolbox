@@ -1,5 +1,4 @@
 import torch
-from torch import nn
 from torchvision.models import resnet, mobilenet, efficientnet
 from torchvision.models.feature_extraction import create_feature_extractor
 

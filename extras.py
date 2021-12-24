@@ -4,6 +4,7 @@ import torch
 from torch import nn
 import torchvision.transforms.functional as TF
 
+
 # https://github.com/pytorch/vision/blob/main/references/classification/transforms.py
 class RandomMixup(nn.Module):
     def __init__(self, num_classes, p=0.5, alpha=1, inplace=False):
@@ -37,6 +38,7 @@ class RandomMixup(nn.Module):
         target.mul_(lambda_param).add_(target_rolled)
 
         return batch, target
+
 
 class RandomCutmix(nn.Module):
     def __init__(self, num_classes, p=0.5, alpha=1, inplace=False):
@@ -85,6 +87,7 @@ class RandomCutmix(nn.Module):
 
         return batch, target
 
+
 class RandomCutMixMixUp(nn.Module):
     def __init__(self, num_classes, cutmix_alpha, mixup_alpha, inplace=False):
         super().__init__()
@@ -99,3 +102,10 @@ class RandomCutMixMixUp(nn.Module):
             return self.mixup(batch, target)
             
         return self.cutmix(batch, target)
+
+
+def extract_backbone_weights(lightning_ckpt_path, save_path):
+    ckpt = torch.load(lightning_ckpt_path)
+    state_dict = ckpt["state_dict"]
+    backbone_weights = {k[len("backbone."):]: v.cpu() for k, v in state_dict.items() if k.startswith("backbone.")}
+    torch.save(backbone_weights, save_path)
