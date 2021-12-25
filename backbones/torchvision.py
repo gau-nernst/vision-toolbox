@@ -26,7 +26,7 @@ class _ExtractorBackbone(BaseBackbone):
         self.out_channels = tuple(out_channels)
 
     def forward_features(self, x):
-        return self.feat_extractor(x).values()
+        return list(self.feat_extractor(x).values())
 
 
 class ResNetExtractor(_ExtractorBackbone):

@@ -1,8 +1,10 @@
 import math
+import time
 
 import torch
 from torch import nn
 import torchvision.transforms.functional as TF
+from fvcore.nn import FlopCountAnalysis
 
 import backbones.torchvision as torchvision_backbones
 
@@ -116,3 +118,40 @@ def extract_backbone_weights(lightning_ckpt_path, save_path):
 def extract_torchvision_backbone_weights(name, save_path):
     m = torchvision_backbones.__dict__[name](pretrained=True)
     torch.save(m.state_dict(), save_path)
+
+
+# Modified from YOLOv5 utils/torch_utils.py
+def profile(module: nn.Module, input: torch.Tensor=None, n: int=10, device="cpu"):
+    if input is None:
+        input = torch.randn((1,3,224,224))
+    
+    input = input.to(device)
+    module = module.to(device)
+    input.requires_grad = True
+
+    flops = FlopCountAnalysis(module, input).total() / 1e9 * 2      # GFLOPs
+
+    def time_sync():
+        torch.cuda.synchronize()
+        return time.time()
+
+    tf, tb, t = 0, 0, [0, 0, 0]     # dt forward, backward
+    for _ in range(n):
+        t[0] = time_sync()
+        out = module(input)
+        t[1] = time_sync()
+
+        out.sum().backward()
+        t[2] = time_sync()
+
+        tf += t[1] - t[0]
+        tb += t[2] - t[1]
+    
+    tf *= 1000 / n      # convert to ms and take average
+    tb *= 1000 / n
+    
+    mem = torch.cuda.memory_reserved() / 1e9 if torch.cuda.is_available() else 0    # GB
+    params = sum(list(x.numel() for x in module.parameters())) / 1e6            # M
+    torch.cuda.empty_cache()
+
+    return params, flops, mem, tf, tb

@@ -32,9 +32,9 @@ Training recipe
 - Val resize: 232, Val crop: 224
 - Mixed-precision training
 
-Note: All hyperparameters are adopted from torchvision's recipe, except number of epochs (600 in torchvision's vs 100 in mine). Since I train for much shorter time, I should have reduced regularizations.
+Note: All hyperparameters are adopted from torchvision's recipe, except number of epochs (600 in torchvision's vs 100 in mine). Since the training time is shorter, augmentations should be reduced.
 
-I use PyTorch Lightning to train the models (see `classifier.py`). The easiest way to run training is to use Lightning CLI with a config file.
+PyTorch Lightning is used to train the models (see `classifier.py`). The easiest way to run training is to use Lightning CLI with a config file (see below). Note that PyTorch Lightning is not required to create, run, and load the models.
 
 ```bash
 python train.py fit --config config.yaml
@@ -49,19 +49,14 @@ Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org
 
 Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections).
 
-For Cross Stage Partial (CPS) networks, there are two approaches to split the feature maps:
+Backbone               | Top-1 acc | #Params(M) | FLOPS(G)*
+-----------------------|-----------|------------|----------
+Darknet-53             | 77.3      | 40.64      | 14.33
+Darknet-53 (paper)^    | 77.2
+CSPDarknet-53          |           | 26.28      | 9.42
+CSPDarknet-53 (paper)^ | 77.2
 
-- Use 2 separate convolutions. YOLOv5 and YOLOX follow this
-- Use 1 convolution and slice the tensor. CSP authors and YOLOv4 follow this
-
-This implementation follows the first approach. More information about the two approaches: https://github.com/WongKinYiu/CrossStagePartialNetworks/issues/18
-
-Backbone | Top-1 acc
----------|----------
-Darknet-53 (224x224) | 77.3
-Darknet-53 (paper, 256x256) | 77.2
-CSPDarknet-53 (224x224) | 77.9
-CSPDarknet-53 (paper, 256x256) | 77.2
+^Paper uses 256x256 image
 
 ## VoVNet
 
@@ -71,9 +66,10 @@ Paper: [[VoVNetV1]](https://arxiv.org/abs/1904.09730) [[VoVNetV2]](https://arxiv
 
 All models use V2 by default (with skip connection + effective Squeeze-Excitation). To create V1 models, pass `residual=False` and `ese=False` to model constructor.
 
-Backbone | Top-1 acc
----------|----------
-VoVNet-57 (224x224) | 79.5
+Backbone  | Top-1 acc | #Params(M) | FLOPS(G)*
+----------|-----------|------------|----------
+VoVNet-39 |           | 25.37      | 15.61
+VoVNet-57 | 79.5      | 41.83      | 19.39
 
 ## torchvision
 
@@ -93,3 +89,26 @@ MobileNet:
 EfficientNet:
 
 - EfficientNet-{B0-B7}
+
+Backbone          | #Params(M) | FLOPS(G)*
+------------------|------------|----------
+ResNet-18         | 11.18      | 3.64
+ResNet-34         | 21.28      | 7.34
+ResNet-50         | 23.51      | 8.22
+ResNet-101        | 42.50      | 15.66
+ResNet-152        | 58.14      | 23.11
+ResNeXt-50 32x4d  | 22.98      | 8.51
+ResNeXt-101 32x8d | 86.74      | 32.95
+MobileNetV2       | 2.22       | 0.6
+MobileNetV3 large | 2.97       | 0.45
+MobileNetV3 small | 0.93       | 0.12
+EfficientNet B0   | 4.01       | 0.80
+EfficientNet B1   | 6.51       | 1.18
+EfficientNet B2   | 7.70       | 1.36
+EfficientNet B3   | 10.70      | 1.98
+EfficientNet B4   | 17.55      | 3.09
+EfficientNet B5   | 28.34      | 4.82
+EfficientNet B6   | 40.74      | 6.86
+EfficientNet B7   | 63.79      | 10.53
+
+*FLOPS is measured with `(1,3,224,224)` input.
