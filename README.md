@@ -34,7 +34,7 @@ Training recipe
 
 Note: All hyperparameters are adopted from torchvision's recipe, except number of epochs (600 in torchvision's vs 100 in mine). Since I train for much shorter time, I should have reduced regularizations.
 
-I use PyTorch Lightning to train the models (see `classifier.py`). The easiest way to run training is to use Lightning CLI and use a config file.
+I use PyTorch Lightning to train the models (see `classifier.py`). The easiest way to run training is to use Lightning CLI with a config file.
 
 ```bash
 python train.py fit --config config.yaml
@@ -60,6 +60,8 @@ Backbone | Top-1 acc
 ---------|----------
 Darknet-53 (224x224) | 77.3
 Darknet-53 (paper, 256x256) | 77.2
+CSPDarknet-53 (224x224) | 77.9
+CSPDarknet-53 (paper, 256x256) | 77.2
 
 ## VoVNet
 
