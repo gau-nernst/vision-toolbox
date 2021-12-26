@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+
 class ConvBnAct(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, act_fn=nn.ReLU):
         super().__init__()
@@ -15,26 +16,28 @@ class ConvBnAct(nn.Sequential):
         elif isinstance(self.act, nn.LeakyReLU):
             nn.init.kaiming_normal_(self.conv.weight, a=self.act.negative_slope, mode=mode, nonlinearity="leaky_relu")
 
+
 class SeperableConv2d(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, dilation=1, act_fn=nn.ReLU6):
         super().__init__()
         self.dw = ConvBnAct(in_channels, in_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=in_channels, act_fn=act_fn)
         self.pw = ConvBnAct(in_channels, out_channels, kernel_size=1, padding=0, act_fn=act_fn)
 
-class ESE(nn.Module):
-    def __init__(self, num_channels):
+
+class ESEBlock(nn.Module):
+    # https://arxiv.org/abs/1911.06667
+    def __init__(self, num_channels, gate_fn=nn.Hardsigmoid):
         super().__init__()
-        self.linear = nn.Linear(num_channels, num_channels)
+        self.linear = nn.Conv2d(num_channels, num_channels, 1)      # use conv so don't need to flatten output
+        self.gate = gate_fn()
 
     def forward(self, x):
         out = F.adaptive_avg_pool2d(x, (1,1))
-        out = torch.flatten(out, start_dim=1)
         out = self.linear(out)
-        out = torch.sigmoid(out)
-        
-        return x * out
+        return x * self.gate(out)
 
-class SPP(nn.Module):
+
+class SPPBlock(nn.Module):
     def __init__(self, num_kernels=None, pool_fn="max"):
         assert pool_fn in ("max", "avg")
         super().__init__()
@@ -47,6 +50,4 @@ class SPP(nn.Module):
     
     def forward(self, x):
         outputs = [pool(x) for pool in self.pools]
-        out = torch.concat(outputs)
-
-        return out
+        return torch.concat(outputs, dim=1)

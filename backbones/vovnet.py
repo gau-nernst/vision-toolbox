@@ -29,21 +29,21 @@ configs = {
         "num_blocks": (1, 1, 2, 2),
         "stage_channels": (128, 160, 192, 224),
         "num_layers": (5, 5, 5, 5),
-        "out_channels": (256, 512, 784, 1024)
+        "out_channels": (256, 512, 768, 1024)
     },
     "vovnet-57": {
         "stem_channels": (64, 64, 128),
         "num_blocks": (1, 1, 4, 3),
         "stage_channels": (128, 160, 192, 224),
         "num_layers": (5, 5, 5, 5),
-        "out_channels": (256, 512, 784, 1024)
+        "out_channels": (256, 512, 768, 1024)
     },
     "vovnet-99": {
         "stem_channels": (64, 64, 128),
         "num_blocks": (1, 3, 9, 3),
         "stage_channels": (128, 160, 192, 224),
         "num_layers": (5, 5, 5, 5),
-        "out_channels": (256, 512, 784, 1024)
+        "out_channels": (256, 512, 768, 1024)
     }
 }
 

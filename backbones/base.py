@@ -14,7 +14,3 @@ class BaseBackbone(nn.Module, metaclass=ABCMeta):
 
     def get_out_channels(self) -> Tuple[int]:
         return self.out_channels
-
-    def load_weights(self, weights_path):
-        self.load_state_dict(torch.load(weights_path))
-        return self
