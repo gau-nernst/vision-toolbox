@@ -55,7 +55,9 @@ Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements 
 
 Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)*
 --------------------------|-----------|------------|----------
+Darknet-19                |           | 22.09      | 6.12
 Darknet-19 (official^)    | 72.9      |            | 7.29
+CSPDarknet-19             |           | 17.79      | 5.27
 Darknet-53                | 77.3      | 40.64      | 14.33
 Darknet-53 (official^)    | 77.2      | 41.57      | 18.57
 CSPDarknet-53             |           | 26.28      | 9.42
@@ -80,10 +82,12 @@ Implementation notes:
 - VoVNet with depth-wise separable convolution is not implemented.
 
 
-Backbone  | Top-1 acc | #Params(M) | FLOPS(G)*
-----------|-----------|------------|----------
-VoVNet-39 |           | 25.18      | 15.62
-VoVNet-57 |           | 41.45      | 19.35
+Backbone       | Top-1 acc | #Params(M) | FLOPS(G)*
+---------------|-----------|------------|----------
+VoVNet-19-slim |           | 2.65       | 4.77
+VoVNet-39      | 77.8      | 25.18      | 15.57
+VoVNet-57      |           | 41.45      | 19.30
+VoVNet-99      |           | 69.52      | 34.43
 
 *FLOPS is measured with `(1,3,224,224)` input.
 
@@ -108,26 +112,26 @@ EfficientNet:
 
 Backbone          | Top-1 acc^ | #Params(M) | FLOPS(G)*
 ------------------|------------|------------|----------
-ResNet-18         | 69.76      | 11.18      | 3.64
-ResNet-34         | 73.31      | 21.28      | 7.34
-ResNet-50         | 76.13      | 23.51      | 8.22
-ResNet-101        | 77.37      | 42.50      | 15.66
-ResNet-152        | 78.31      | 58.14      | 23.11
-ResNeXt-50 32x4d  | 77.62      | 22.98      | 8.51
-ResNeXt-101 32x8d | 79.31      | 86.74      | 32.95
-Wide ResNet-50-2  | 78.47
-Wide ResNet-101-2 | 78.85
-MobileNetV2       | 71.88      | 2.22       | 0.6
-MobileNetV3 large | 74.04      | 2.97       | 0.45
-MobileNetV3 small | 67.67      | 0.93       | 0.12
-EfficientNet B0   | 77.69      | 4.01       | 0.80
-EfficientNet B1   | 78.64      | 6.51       | 1.18
-EfficientNet B2   | 80.61      | 7.70       | 1.36
-EfficientNet B3   | 82.01      | 10.70      | 1.98
-EfficientNet B4   | 83.38      | 17.55      | 3.09
-EfficientNet B5   | 83.44      | 28.34      | 4.82
-EfficientNet B6   | 84.01      | 40.74      | 6.86
-EfficientNet B7   | 84.12      | 63.79      | 10.53
+ResNet-18         | 69.8       | 11.18      | 3.64
+ResNet-34         | 73.3       | 21.28      | 7.34
+ResNet-50         | 76.1       | 23.51      | 8.22
+ResNet-101        | 77.4       | 42.50      | 15.66
+ResNet-152        | 78.3       | 58.14      | 23.11
+ResNeXt-50 32x4d  | 77.6       | 22.98      | 8.51
+ResNeXt-101 32x8d | 79.3       | 86.74      | 32.95
+Wide ResNet-50-2  | 78.5       | 66.83      | 22.85
+Wide ResNet-101-2 | 78.9       | 124.84     | 45.59
+MobileNetV2       | 71.9       | 2.22       | 0.6
+MobileNetV3 large | 74.0       | 2.97       | 0.45
+MobileNetV3 small | 67.7       | 0.93       | 0.12
+EfficientNet B0   | 77.7       | 4.01       | 0.80
+EfficientNet B1   | 78.6       | 6.51       | 1.18
+EfficientNet B2   | 80.6       | 7.70       | 1.36
+EfficientNet B3   | 82.0       | 10.70      | 1.98
+EfficientNet B4   | 83.4       | 17.55      | 3.09
+EfficientNet B5   | 83.4       | 28.34      | 4.82
+EfficientNet B6   | 84.0       | 40.74      | 6.86
+EfficientNet B7   | 84.1       | 63.79      | 10.53
 
 *FLOPS is measured with `(1,3,224,224)` input.
 
