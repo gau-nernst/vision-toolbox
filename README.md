@@ -1,11 +1,15 @@
-# Vision Backbones
+# Vision Toolbox
+
+Backbones, necks, and useful modules for Vision tasks.
+
+## Backbones
 
 Implemented backbones:
 
 - [Darknet](#darknet)
 - [VoVNet](#vovnet)
 
-## ImageNet
+### ImageNet pre-training
 
 Download ImageNet Challenge here: https://www.kaggle.com/c/imagenet-object-localization-challenge/
 
@@ -40,7 +44,7 @@ PyTorch Lightning is used to train the models (see `classifier.py`). The easiest
 python train.py fit --config config.yaml
 ```
 
-## Darknet
+### Darknet
 
 Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org/abs/1804.02767)
 
@@ -49,16 +53,19 @@ Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org
 
 Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections).
 
-Backbone               | Top-1 acc | #Params(M) | FLOPS(G)*
------------------------|-----------|------------|----------
-Darknet-53             | 77.3      | 40.64      | 14.33
-Darknet-53 (paper)^    | 77.2
-CSPDarknet-53          |           | 26.28      | 9.42
-CSPDarknet-53 (paper)^ | 77.2
+Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)*
+--------------------------|-----------|------------|----------
+Darknet-19 (official^)    | 72.9      |            | 7.29
+Darknet-53                | 77.3      | 40.64      | 14.33
+Darknet-53 (official^)    | 77.2      | 41.57      | 18.57
+CSPDarknet-53             |           | 26.28      | 9.42
+CSPDarknet-53 (official^) | 77.2      | 27.61      | 13.07
 
-^Paper uses 256x256 image
+*FLOPS is measured with `(1,3,224,224)` input.
 
-## VoVNet
+^Sources: [[pjreddie's website]](https://pjreddie.com/darknet/imagenet/) [[WongKinYiu's CSP GitHubb repo]](https://github.com/WongKinYiu/CrossStagePartialNetworks). Official Darknet models use 256x256 image, thus their FLOPS are slightly higher. The 1000-class classification head is probaby included in their Parameters and FLOPS count, resulting in slightly higher numbers.
+
+### VoVNet
 
 Paper: [[VoVNetV1]](https://arxiv.org/abs/1904.09730) [[VoVNetV2]](https://arxiv.org/abs/1911.06667)
 
@@ -78,9 +85,11 @@ Backbone  | Top-1 acc | #Params(M) | FLOPS(G)*
 VoVNet-39 |           | 25.18      | 15.62
 VoVNet-57 |           | 41.45      | 19.35
 
-## torchvision
+*FLOPS is measured with `(1,3,224,224)` input.
 
-Port some torchvision models to output multiple feature maps.
+### torchvision
+
+Some torchvision classification models are ported to use with the toolbox. They can output multiple feature map levels.
 
 ResNet:
 
@@ -97,25 +106,29 @@ EfficientNet:
 
 - EfficientNet-{B0-B7}
 
-Backbone          | #Params(M) | FLOPS(G)*
-------------------|------------|----------
-ResNet-18         | 11.18      | 3.64
-ResNet-34         | 21.28      | 7.34
-ResNet-50         | 23.51      | 8.22
-ResNet-101        | 42.50      | 15.66
-ResNet-152        | 58.14      | 23.11
-ResNeXt-50 32x4d  | 22.98      | 8.51
-ResNeXt-101 32x8d | 86.74      | 32.95
-MobileNetV2       | 2.22       | 0.6
-MobileNetV3 large | 2.97       | 0.45
-MobileNetV3 small | 0.93       | 0.12
-EfficientNet B0   | 4.01       | 0.80
-EfficientNet B1   | 6.51       | 1.18
-EfficientNet B2   | 7.70       | 1.36
-EfficientNet B3   | 10.70      | 1.98
-EfficientNet B4   | 17.55      | 3.09
-EfficientNet B5   | 28.34      | 4.82
-EfficientNet B6   | 40.74      | 6.86
-EfficientNet B7   | 63.79      | 10.53
+Backbone          | Top-1 acc^ | #Params(M) | FLOPS(G)*
+------------------|------------|------------|----------
+ResNet-18         | 69.76      | 11.18      | 3.64
+ResNet-34         | 73.31      | 21.28      | 7.34
+ResNet-50         | 76.13      | 23.51      | 8.22
+ResNet-101        | 77.37      | 42.50      | 15.66
+ResNet-152        | 78.31      | 58.14      | 23.11
+ResNeXt-50 32x4d  | 77.62      | 22.98      | 8.51
+ResNeXt-101 32x8d | 79.31      | 86.74      | 32.95
+Wide ResNet-50-2  | 78.47
+Wide ResNet-101-2 | 78.85
+MobileNetV2       | 71.88      | 2.22       | 0.6
+MobileNetV3 large | 74.04      | 2.97       | 0.45
+MobileNetV3 small | 67.67      | 0.93       | 0.12
+EfficientNet B0   | 77.69      | 4.01       | 0.80
+EfficientNet B1   | 78.64      | 6.51       | 1.18
+EfficientNet B2   | 80.61      | 7.70       | 1.36
+EfficientNet B3   | 82.01      | 10.70      | 1.98
+EfficientNet B4   | 83.38      | 17.55      | 3.09
+EfficientNet B5   | 83.44      | 28.34      | 4.82
+EfficientNet B6   | 84.01      | 40.74      | 6.86
+EfficientNet B7   | 84.12      | 63.79      | 10.53
 
 *FLOPS is measured with `(1,3,224,224)` input.
+
+^Top-1 accuracy is copied from [torchvision's documentation](https://pytorch.org/vision/stable/models.html) (0.11.0 at the time of writing)
