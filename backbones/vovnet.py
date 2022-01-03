@@ -81,9 +81,9 @@ class OSAStage(nn.Sequential):
     def __init__(self, num_blocks, in_channels, stage_channels, num_layers, out_channels, residual=True, ese=True):
         super().__init__()
         self.max_pool = nn.MaxPool2d(3, 2, padding=1)
-        self.module_0 = OSABlock(in_channels, stage_channels, num_layers, out_channels, residual=False, ese=ese)
-        for i in range(1, num_blocks):
-            self.add_module(f"module_{i}", OSABlock(out_channels, stage_channels, num_layers, out_channels, residual=residual, ese=ese))
+        for i in range(num_blocks):
+            in_c = in_channels if i == 0 else out_channels
+            self.add_module(f"module_{i}", OSABlock(in_c, stage_channels, num_layers, out_channels, residual=residual, ese=ese))
 
 
 class VoVNet(BaseBackbone):
@@ -92,15 +92,15 @@ class VoVNet(BaseBackbone):
         super().__init__()
         self.out_channels = tuple(out_channels)
         self.stem = nn.Sequential()
-        in_channels = 3
+        in_c = 3
         for i, c in enumerate(stem_channels):
-            self.stem.add_module(str(i), ConvBnAct(in_channels, c, stride=2 if i == 0 else 1))
-            in_channels = c
+            self.stem.add_module(str(i), ConvBnAct(in_c, c, stride=2 if i == 0 else 1))
+            in_c = c
         
         self.stages = nn.ModuleList()
         for n, stage_c, n_l, out_c in zip(num_blocks, stage_channels, num_layers, out_channels):
-            self.stages.append(OSAStage(n, in_channels, stage_c, n_l, out_c, residual=residual, ese=ese))
-            in_channels = out_c
+            self.stages.append(OSAStage(n, in_c, stage_c, n_l, out_c, residual=residual, ese=ese))
+            in_c = out_c
 
     def forward_features(self, x):
         outputs = []
