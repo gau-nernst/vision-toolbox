@@ -6,7 +6,7 @@ from torch import nn
 import torchvision.transforms.functional as TF
 from fvcore.nn import FlopCountAnalysis
 
-import backbones.torchvision as torchvision_backbones
+import vision_toolbox.backbones.torchvision as torchvision_backbones
 
 
 # https://github.com/pytorch/vision/blob/main/references/classification/transforms.py
@@ -150,7 +150,7 @@ def profile(module: nn.Module, input: torch.Tensor=None, n: int=10, device="cpu"
     tf *= 1000 / n      # convert to ms and take average
     tb *= 1000 / n
     
-    mem = torch.cuda.memory_reserved() / 1e9 if torch.cuda.is_available() else 0    # GB
+    mem = torch.cuda.memory_reserved(device) / 1e9 if torch.cuda.is_available() else 0    # GB
     params = sum(list(x.numel() for x in module.parameters())) / 1e6            # M
     torch.cuda.empty_cache()
 

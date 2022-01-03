@@ -6,13 +6,11 @@ import torch
 from torch import nn
 
 from .base import BaseBackbone
-from .components import ConvBnAct, ESEBlock
+from ..components import ConvBnAct, ESEBlock
 
 
 __all__ = [
-    "VoVNet",
-    "vovnet19_slim", "vovnet39",
-    "vovnet57", "vovnet99"
+    "VoVNet", "vovnet19_slim", "vovnet39", "vovnet57", "vovnet99"
 ]
 
 # https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py

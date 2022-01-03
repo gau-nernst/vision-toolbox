@@ -7,7 +7,7 @@ import torch
 from torch import nn
 
 from .base import BaseBackbone
-from .components import ConvBnAct
+from ..components import ConvBnAct
 
 
 __all__ = [

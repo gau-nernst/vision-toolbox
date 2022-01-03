@@ -10,9 +10,10 @@ from torchvision.datasets import ImageFolder
 import torchvision.transforms as T
 from torchvision.transforms.functional import InterpolationMode
 import pytorch_lightning as pl
+import webdataset as wds
 
-import backbones
-from backbones.base import BaseBackbone
+from vision_toolbox import backbones
+from vision_toolbox.backbones.base import BaseBackbone
 from extras import RandomCutMixMixUp
 
 # https://github.com/pytorch/vision/blob/main/references/classification/train.py
@@ -56,10 +57,15 @@ class ImageClassifier(pl.LightningModule):
         warmup_decay: float=0.01,
 
         # others
-        jit: bool=True
+        jit: bool=True,
+        backbone_weights: str=None,
+        webdataset: bool=False
         ):
         super().__init__()
         self.backbone = backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
+        if backbone_weights is not None:
+            self.backbone.load_state_dict(torch.load(backbone_weights))
+        
         self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((1,1)),
             nn.Flatten(),
@@ -87,13 +93,23 @@ class ImageClassifier(pl.LightningModule):
 
         self.save_hyperparameters()
 
-    def train_dataloader(self):        
+    def train_dataloader(self):
         transform = T.Compose([
             T.RandomResizedCrop(self.hparams.train_crop_size),
             T.PILToTensor()
         ])
-        ds = ImageFolder(self.hparams.train_dir, transform=transform)
-        dataloader = DataLoader(ds, batch_size=self.hparams.batch_size, shuffle=True, num_workers=self.hparams.num_workers, pin_memory=True)
+        if self.hparams.webdataset:
+            ds = (
+                wds.WebDataset(self.hparams.train_dir)
+                .decode(wds.imagehandler("pil"))
+                .to_tuple("jpg;jpeg;png cls")
+                .map_tuple(transform, lambda x: x)
+                .batched(self.hparams.batch_size)
+            )
+            dataloader = wds.WebLoader(ds, batch_size=None, shuffle=True, num_workers=self.hparams.num_workers, pin_memory=True)
+        else:
+            ds = ImageFolder(self.hparams.train_dir, transform=transform)
+            dataloader = DataLoader(ds, batch_size=self.hparams.batch_size, shuffle=True, num_workers=self.hparams.num_workers, pin_memory=True)
         return dataloader
 
     def val_dataloader(self):

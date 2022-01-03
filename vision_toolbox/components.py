@@ -8,7 +8,8 @@ class ConvBnAct(nn.Sequential):
         super().__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=False)
         self.bn = nn.BatchNorm2d(out_channels)
-        self.act = act_fn(inplace=True)
+        if act_fn is not None:
+            self.act = act_fn(inplace=True)
         
         mode = "fan_out"
         if isinstance(self.act, (nn.ReLU, nn.ReLU6)):
@@ -24,8 +25,8 @@ class SeperableConv2d(nn.Sequential):
         self.pw = ConvBnAct(in_channels, out_channels, kernel_size=1, padding=0, act_fn=act_fn)
 
 
+# https://arxiv.org/abs/1911.06667
 class ESEBlock(nn.Module):
-    # https://arxiv.org/abs/1911.06667
     def __init__(self, num_channels, gate_fn=nn.Hardsigmoid):
         super().__init__()
         self.linear = nn.Conv2d(num_channels, num_channels, 1)      # use conv so don't need to flatten output
@@ -35,6 +36,11 @@ class ESEBlock(nn.Module):
         out = F.adaptive_avg_pool2d(x, (1,1))
         out = self.linear(out)
         return x * self.gate(out)
+
+
+class DeformableConv2d(nn.Module):
+    def __init__(self):
+        super().__init__()
 
 
 class SPPBlock(nn.Module):
