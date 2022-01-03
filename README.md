@@ -14,8 +14,9 @@ Implemented backbones:
 Download ImageNet Challenge here: https://www.kaggle.com/c/imagenet-object-localization-challenge/
 
 ```
-unzip imagenet-object-localization-challenge
-tar -xf imagenet-object-localization-challenge -C ImageNet
+kaggle competitions download -c imagenet-object-localization-challenge
+unzip imagenet-object-localization-challenge.zip -d ImageNet
+tar -xf ImageNet/imagenet_object_localization_patched2019.tar.gz -C ImageNet
 python ./scripts/imagenet.py --val_solution_path ./ImageNet/LOC_val_solution.csv --val_image_dir ./ImageNet/ILSVRC/Data/CLS-LOC/val
 ```
 
