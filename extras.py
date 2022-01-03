@@ -4,7 +4,6 @@ import time
 import torch
 from torch import nn
 import torchvision.transforms.functional as TF
-from fvcore.nn import FlopCountAnalysis
 
 import vision_toolbox.backbones.torchvision as torchvision_backbones
 
@@ -122,6 +121,7 @@ def extract_torchvision_backbone_weights(name, save_path):
 
 # Modified from YOLOv5 utils/torch_utils.py
 def profile(module: nn.Module, input: torch.Tensor=None, n: int=10, device="cpu"):
+    from fvcore.nn import FlopCountAnalysis
     if input is None:
         input = torch.randn((1,3,224,224))
     

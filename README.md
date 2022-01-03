@@ -66,7 +66,7 @@ CSPDarknet-53 (official^) | 77.2      | 27.61      | 13.07
 
 *FLOPS is measured with `(1,3,224,224)` input.
 
-^Sources: [[pjreddie's website]](https://pjreddie.com/darknet/imagenet/) [[WongKinYiu's CSP GitHubb repo]](https://github.com/WongKinYiu/CrossStagePartialNetworks). Official Darknet models use 256x256 image, thus their FLOPS are slightly higher. The 1000-class classification head is probaby included in their Parameters and FLOPS count, resulting in slightly higher numbers.
+^Sources: [[pjreddie's website]](https://pjreddie.com/darknet/imagenet/) [[WongKinYiu's CSP GitHub repo]](https://github.com/WongKinYiu/CrossStagePartialNetworks). Official Darknet models use 256x256 image, thus their FLOPS are slightly higher. The 1000-class classification head is probaby included in their Parameters and FLOPS count, resulting in slightly higher numbers.
 
 ### VoVNet
 
@@ -86,7 +86,7 @@ Implementation notes:
 Backbone       | Top-1 acc | #Params(M) | FLOPS(G)*
 ---------------|-----------|------------|----------
 VoVNet-19-slim |           | 2.65       | 4.77
-VoVNet-39      | 77.8      | 25.18      | 15.57
+VoVNet-39      | 78.1      | 25.18      | 15.57
 VoVNet-57      |           | 41.45      | 19.30
 VoVNet-99      |           | 69.52      | 34.43
 

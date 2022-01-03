@@ -55,26 +55,26 @@ class DarknetStage(nn.Module):
 
 class CSPDarknetStage(nn.Module):
     def __init__(self, n, in_channels, out_channels):
+        assert n > 0
         super().__init__()
         self.conv = ConvBnAct(in_channels, out_channels, stride=2)
-        self.n = n
-        if n > 0:
-            half_channels = out_channels // 2
-            self.conv1 = ConvBnAct(out_channels, half_channels, kernel_size=1, padding=0)
-            self.conv2 = ConvBnAct(out_channels, half_channels, kernel_size=1, padding=0)
-            self.blocks = nn.Sequential(*[DarknetBlock(half_channels, expansion=1) for _ in range(n)])
-            self.out_conv = ConvBnAct(out_channels, out_channels, kernel_size=1, padding=0)
+
+        half_channels = out_channels // 2
+        self.conv1 = ConvBnAct(out_channels, half_channels, kernel_size=1, padding=0)
+        self.conv2 = ConvBnAct(out_channels, half_channels, kernel_size=1, padding=0)
+        self.blocks = nn.Sequential(*[DarknetBlock(half_channels, expansion=1) for _ in range(n)])
+        self.out_conv = ConvBnAct(out_channels, out_channels, kernel_size=1, padding=0)
 
     def forward(self, x):
         out = self.conv(x)
-        if self.n > 0:
-            # using 2 convs is faster than using 1 conv then split
-            out1 = self.conv1(out)
-            out2 = self.conv2(out)
+        
+        # using 2 convs is faster than using 1 conv then split
+        out1 = self.conv1(out)
+        out2 = self.conv2(out)
 
-            out2 = self.blocks(out2)
-            out = torch.cat((out1, out2), dim=1)
-            out = self.out_conv(out)
+        out2 = self.blocks(out2)
+        out = torch.cat((out1, out2), dim=1)
+        out = self.out_conv(out)
         return out
 
 
@@ -90,7 +90,7 @@ class Darknet(BaseBackbone):
         self.stages = nn.ModuleList()
         in_c = stem_channels
         for n, c in zip(num_blocks, num_channels):
-            self.stages.append(block_fn(n, in_c, c))
+            self.stages.append(block_fn(n, in_c, c) if n > 0 else ConvBnAct(in_c, c, stride=2))
             in_c = c
 
     def forward_features(self, x):
