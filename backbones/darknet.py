@@ -11,9 +11,7 @@ from .components import ConvBnAct
 
 
 __all__ = [
-    "Darknet", "CSPDarknet",
-    "darknet19", "darknet53",
-    "cspdarknet19", "cspdarknet53"
+    "Darknet", "darknet19", "darknet53", "cspdarknet19", "cspdarknet53"
 ]
 
 configs = {
@@ -58,42 +56,42 @@ class DarknetStage(nn.Module):
 class CSPDarknetStage(nn.Module):
     def __init__(self, n, in_channels, out_channels):
         super().__init__()
-        self.n = n
         self.conv = ConvBnAct(in_channels, out_channels, stride=2)
-
+        self.n = n
         if n > 0:
             half_channels = out_channels // 2
             self.conv1 = ConvBnAct(out_channels, half_channels, kernel_size=1, padding=0)
             self.conv2 = ConvBnAct(out_channels, half_channels, kernel_size=1, padding=0)
             self.blocks = nn.Sequential(*[DarknetBlock(half_channels, expansion=1) for _ in range(n)])
-            
             self.out_conv = ConvBnAct(out_channels, out_channels, kernel_size=1, padding=0)
 
     def forward(self, x):
         out = self.conv(x)
-        if self.n > 0:    
-            out1 = self.conv1(out)      # using 2 convs is faster than using 1 conv then split
+        if self.n > 0:
+            # using 2 convs is faster than using 1 conv then split
+            out1 = self.conv1(out)
             out2 = self.conv2(out)
 
             out2 = self.blocks(out2)
             out = torch.cat((out1, out2), dim=1)
             out = self.out_conv(out)
-        
         return out
 
 
 class Darknet(BaseBackbone):
-    def __init__(self, stem_channels, num_blocks, num_channels):
+    def __init__(self, stem_channels, num_blocks, num_channels, block_fn=None):
         super().__init__()
+        if block_fn is None:
+            block_fn = DarknetStage
+        
         self.out_channels = tuple(num_channels)
         self.stem = ConvBnAct(3, stem_channels)
         
         self.stages = nn.ModuleList()
-        in_channels = stem_channels
+        in_c = stem_channels
         for n, c in zip(num_blocks, num_channels):
-            new_stage = DarknetStage(n, in_channels, c)
-            self.stages.append(new_stage)
-            in_channels = c
+            self.stages.append(block_fn(n, in_c, c))
+            in_c = c
 
     def forward_features(self, x):
         outputs = []
@@ -101,25 +99,10 @@ class Darknet(BaseBackbone):
         for s in self.stages:
             out = s(out)
             outputs.append(out)
-
         return outputs
 
 
-class CSPDarknet(Darknet):
-    def __init__(self, stem_channels, num_blocks, num_channels):
-        nn.Module.__init__(self)
-        self.out_channels = tuple(num_channels)
-        self.stem = ConvBnAct(3, stem_channels)
-
-        self.stages = nn.ModuleList()
-        in_channels = stem_channels
-        for n, c in zip(num_blocks, num_channels):
-            new_stage = CSPDarknetStage(n, in_channels, c)
-            self.stages.append(new_stage)
-            in_channels = c
-
-
-def darknet19(): return Darknet(**configs["darknet-19"])
-def darknet53(): return Darknet(**configs["darknet-53"])
-def cspdarknet19(): return CSPDarknet(**configs["darknet-19"])
-def cspdarknet53(): return CSPDarknet(**configs["darknet-53"])
+def darknet19(): return Darknet(**configs["darknet-19"], block_fn=DarknetStage)
+def darknet53(): return Darknet(**configs["darknet-53"], block_fn=DarknetStage)
+def cspdarknet19(): return Darknet(**configs["darknet-19"], block_fn=CSPDarknetStage)
+def cspdarknet53(): return Darknet(**configs["darknet-53"], block_fn=CSPDarknetStage)
