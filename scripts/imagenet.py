@@ -30,5 +30,8 @@ def main():
     parser.add_argument("--val_solution_path", type=str)
     parser.add_argument("--val_image_dir", type=str)
     
-    parser.parse_args()
-    sort_val_images(parser.val_solution_path, parser.val_image_dir)
+    args = parser.parse_args()
+    sort_val_images(args.val_solution_path, args.val_image_dir)
+
+if __name__ == "__main__":
+    main()
