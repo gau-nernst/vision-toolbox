@@ -59,7 +59,9 @@ class ImageClassifier(pl.LightningModule):
         # others
         jit: bool=True,
         backbone_weights: str=None,
-        webdataset: bool=False
+        webdataset: bool=False,
+        train_size: int=0,
+        val_size: int=0
         ):
         super().__init__()
         self.backbone = backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
@@ -93,24 +95,32 @@ class ImageClassifier(pl.LightningModule):
 
         self.save_hyperparameters()
 
+    def get_dataloader(self, transform, training=False, pin_memory=True):
+        if self.hparams.webdataset:
+            # https://webdataset.github.io/webdataset/multinode/
+            # https://github.com/webdataset/webdataset-lightning/blob/main/train.py
+            ds = (
+                wds.WebDataset(self.hparams.train_dir, shardshuffle=training)
+                .shuffle(1000 if training else 0)
+                .decode("pil")
+                .to_tuple("jpg;jpeg;png cls")
+                .map_tuple(transform, lambda x: x)
+                .batched(self.hparams.batch_size, partial=not training)
+            )
+            dataloader = wds.WebLoader(ds, batch_size=None, num_workers=self.hparams.num_workers, pin_memory=pin_memory)
+            if training:
+                dataloader = dataloader.ddp_equalize(self.hparams.train_size//self.hparams.batch_size)
+        else:
+            ds = ImageFolder(self.hparams.train_dir, transform=transform)
+            dataloader = DataLoader(ds, batch_size=self.hparams.batch_size, shuffle=training, num_workers=self.hparams.num_workers, pin_memory=pin_memory)
+        return dataloader
+
     def train_dataloader(self):
         transform = T.Compose([
             T.RandomResizedCrop(self.hparams.train_crop_size),
             T.PILToTensor()
         ])
-        if self.hparams.webdataset:
-            ds = (
-                wds.WebDataset(self.hparams.train_dir)
-                .decode(wds.imagehandler("pil"))
-                .to_tuple("jpg;jpeg;png cls")
-                .map_tuple(transform, lambda x: x)
-                .batched(self.hparams.batch_size)
-            )
-            dataloader = wds.WebLoader(ds, batch_size=None, shuffle=True, num_workers=self.hparams.num_workers, pin_memory=True)
-        else:
-            ds = ImageFolder(self.hparams.train_dir, transform=transform)
-            dataloader = DataLoader(ds, batch_size=self.hparams.batch_size, shuffle=True, num_workers=self.hparams.num_workers, pin_memory=True)
-        return dataloader
+        return self.get_dataloader(transform, training=True)
 
     def val_dataloader(self):
         transform = T.Compose([
@@ -120,9 +130,7 @@ class ImageClassifier(pl.LightningModule):
             T.ConvertImageDtype(torch.float),
             T.Normalize(mean=(0.5,0.5,0.5), std=(0.5,0.5,0.5))
         ])
-        ds = ImageFolder(self.hparams.val_dir, transform=transform)
-        dataloader = DataLoader(ds, batch_size=self.hparams.batch_size, shuffle=False, num_workers=self.hparams.num_workers, pin_memory=True)
-        return dataloader
+        return self.get_dataloader(transform, training=False)
 
     def forward(self, x):
         out = self.backbone(x)
