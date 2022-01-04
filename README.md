@@ -52,13 +52,12 @@ Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org
 - Darknet-{19,53}
 - CSPDarknet-{19,53}
 
-Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections).
+Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections). All LeakyReLU is replaced with ReLU.
 
 Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)*
 --------------------------|-----------|------------|----------
-Darknet-19                |           | 22.09      | 6.12
+Darknet-19                |           | 19.82      | 5.50
 Darknet-19 (official^)    | 72.9      |            | 7.29
-CSPDarknet-19             |           | 17.79      | 5.27
 Darknet-53                | 77.3      | 40.64      | 14.33
 Darknet-53 (official^)    | 77.2      | 41.57      | 18.57
 CSPDarknet-53             | 77.1      | 26.28      | 9.42

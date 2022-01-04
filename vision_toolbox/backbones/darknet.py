@@ -18,7 +18,7 @@ configs = {
     "darknet-19": {
         "stem_channels": 32,
         "num_blocks": (0, 1, 1, 2, 2),
-        "num_channels": (64, 128, 256, 612, 1024)
+        "num_channels": (64, 128, 256, 512, 1024)
     },
     "darknet-53": {
         "stem_channels": 32,
