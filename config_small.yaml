@@ -1,5 +1,5 @@
 model:
-  backbone: vovnet57
+  backbone: vovnet19_slim
   num_classes: 1000
 
   train_dir: datasets/ImageNet/ILSVRC/Data/CLS-LOC/train
@@ -11,6 +11,12 @@ model:
   optimizer: SGD
   lr: 0.5
   weight_decay: 0.00002
+
+  # turn off augmentation, only use TrivialAugment
+  random_erasing_p: 0
+  mixup_alpha: 0
+  cutmix_alpha: 0
+  label_smoothing: 0
 
 trainer:
   gpus: 2

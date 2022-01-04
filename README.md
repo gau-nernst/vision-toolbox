@@ -61,7 +61,7 @@ Darknet-19 (official^)    | 72.9      |            | 7.29
 CSPDarknet-19             |           | 17.79      | 5.27
 Darknet-53                | 77.3      | 40.64      | 14.33
 Darknet-53 (official^)    | 77.2      | 41.57      | 18.57
-CSPDarknet-53             |           | 26.28      | 9.42
+CSPDarknet-53             | 77.1      | 26.28      | 9.42
 CSPDarknet-53 (official^) | 77.2      | 27.61      | 13.07
 
 *FLOPS is measured with `(1,3,224,224)` input.
