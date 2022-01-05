@@ -13,11 +13,18 @@ Implemented backbones:
 
 Download ImageNet Challenge here: https://www.kaggle.com/c/imagenet-object-localization-challenge/
 
-```
+```bash
 kaggle competitions download -c imagenet-object-localization-challenge
 unzip imagenet-object-localization-challenge.zip -d ImageNet
 tar -xf ImageNet/imagenet_object_localization_patched2019.tar.gz -C ImageNet
 python ./scripts/imagenet.py --val_solution_path ./ImageNet/LOC_val_solution.csv --val_image_dir ./ImageNet/ILSVRC/Data/CLS-LOC/val
+```
+
+To create WebDataset shards
+
+```bash
+python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/train --save_dir ./ImageNet/webdataset/train --shuffle True
+python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/val --save_dir ./ImageNet/webdataset/val --shuffle False
 ```
 
 Reference training recipe:
@@ -30,14 +37,15 @@ Training recipe
 
 - Optimizer: SGD, learning rate = 0.5, weight decay = 2e-5, 100 epochs
 - LR schedule: Linear warmup for 5 epochs, then cosine annealing
-- Batch size: 1024 (512 per GPU, 2x RTX3090, DDP)
+- Batch size: 1024 (512 per GPU, 2x RTX3090, DDP, no SyncBN)
 - Augmentations: Random Resized Crop, Trivial Augmentation, Randome Erasing (p=0.1), CutMix (alpha=1.0), and MixUp (alpha=0.2). For each batch, either CutMix or MixUp is applied, but not both.
+  - Random Erasing, CutMix, and Mixup are removed for small models (Darknet-19, VoVNet-19-slim)
 - Label smoothing = 0.1
 - Train res: 176
 - Val resize: 232, Val crop: 224
 - Mixed-precision training
 
-Note: All hyperparameters are adopted from torchvision's recipe, except number of epochs (600 in torchvision's vs 100 in mine). Since the training time is shorter, augmentations should be reduced.
+Note: All hyperparameters are adopted from torchvision's recipe, except number of epochs (600 in torchvision's vs 100 in mine). Since the training time is shorter, augmentations should be reduced. Model EMA is not used.
 
 PyTorch Lightning is used to train the models (see `classifier.py`). The easiest way to run training is to use Lightning CLI with a config file (see below). Note that PyTorch Lightning is not required to create, run, and load the models.
 
@@ -56,7 +64,7 @@ Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements 
 
 Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)*
 --------------------------|-----------|------------|----------
-Darknet-19                |           | 19.82      | 5.50
+Darknet-19                | 73.5      | 19.82      | 5.50
 Darknet-19 (official^)    | 72.9      |            | 7.29
 Darknet-53                | 77.3      | 40.64      | 14.33
 Darknet-53 (official^)    | 77.2      | 41.57      | 18.57
@@ -81,10 +89,9 @@ Implementation notes:
 - Both original implementation and timm merge max pool in stage 2 to the stem's last convolution (stage 1). This differs from VoVNetV1 paper. This implementation keeps max pool in stage 2. A few reasons for this: keep the code simple; stride 2 (stem) output is sufficiently good with 3 convs (although in practice rarely stride 2 output is used); stay faithful to the paper's specifications.
 - VoVNet with depth-wise separable convolution is not implemented.
 
-
 Backbone       | Top-1 acc | #Params(M) | FLOPS(G)*
 ---------------|-----------|------------|----------
-VoVNet-19-slim |           | 2.65       | 4.77
+VoVNet-19-slim | 70.7      | 2.65       | 4.77
 VoVNet-39      | 78.1      | 25.18      | 15.57
 VoVNet-57      |           | 41.45      | 19.30
 VoVNet-99      |           | 69.52      | 34.43

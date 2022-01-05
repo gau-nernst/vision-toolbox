@@ -96,11 +96,12 @@ class ImageClassifier(pl.LightningModule):
         self.save_hyperparameters()
 
     def get_dataloader(self, transform, training=False, pin_memory=True):
+        data_dir = self.hparams.train_dir if training else self.hparams.val_dir
         if self.hparams.webdataset:
             # https://webdataset.github.io/webdataset/multinode/
             # https://github.com/webdataset/webdataset-lightning/blob/main/train.py
             ds = (
-                wds.WebDataset(self.hparams.train_dir, shardshuffle=training)
+                wds.WebDataset(data_dir, shardshuffle=training)
                 .shuffle(1000 if training else 0)
                 .decode("pil")
                 .to_tuple("jpg;jpeg;png cls")
@@ -111,7 +112,7 @@ class ImageClassifier(pl.LightningModule):
             if training:
                 dataloader = dataloader.ddp_equalize(self.hparams.train_size//self.hparams.batch_size)
         else:
-            ds = ImageFolder(self.hparams.train_dir, transform=transform)
+            ds = ImageFolder(data_dir, transform=transform)
             dataloader = DataLoader(ds, batch_size=self.hparams.batch_size, shuffle=training, num_workers=self.hparams.num_workers, pin_memory=pin_memory)
         return dataloader
 
