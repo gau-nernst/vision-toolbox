@@ -108,9 +108,9 @@ class RandomCutMixMixUp(nn.Module):
 
 
 def extract_backbone_weights(lightning_ckpt_path, save_path):
-    ckpt = torch.load(lightning_ckpt_path)
+    ckpt = torch.load(lightning_ckpt_path, map_location='cpu')
     state_dict = ckpt["state_dict"]
-    backbone_weights = {k[len("backbone."):]: v.cpu() for k, v in state_dict.items() if k.startswith("backbone.")}
+    backbone_weights = {k[len("backbone."):]: v for k, v in state_dict.items() if k.startswith("backbone.")}
     torch.save(backbone_weights, save_path)
 
 
