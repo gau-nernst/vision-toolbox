@@ -27,6 +27,8 @@ python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/train --save_d
 python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/val --save_dir ./ImageNet/webdataset/val --shuffle False
 ```
 
+There should be 147 shards of training set, and 7 shards of validation set. Each shard is 1GB.
+
 Reference training recipe:
 
 - https://github.com/pytorch/vision/blob/main/references/classification/train.py
@@ -93,7 +95,7 @@ Backbone       | Top-1 acc | #Params(M) | FLOPS(G)*
 ---------------|-----------|------------|----------
 VoVNet-19-slim | 70.7      | 2.65       | 4.77
 VoVNet-39      | 78.1      | 25.18      | 15.57
-VoVNet-57      |           | 41.45      | 19.30
+VoVNet-57      | 79.2      | 41.45      | 19.30
 VoVNet-99      |           | 69.52      | 34.43
 
 *FLOPS is measured with `(1,3,224,224)` input.
@@ -101,6 +103,9 @@ VoVNet-99      |           | 69.52      | 34.43
 ### torchvision
 
 Some torchvision classification models are ported to use with the toolbox. They can output multiple feature map levels.
+
+- For MobileNet and EfficientNet models, intermediate outputs are taken after the first 1x1 conv expansion layer of the strided MBConv block. See Section 6.2 of [MobileNetv2 paper](https://arxiv.org/abs/1801.04381) and Section 6.3 of [MobileNetv3 paper](https://arxiv.org/abs/1905.02244).
+- To use weights from the new PyTorch training recipe, go to torchvision's [prototype](https://github.com/pytorch/vision/tree/main/torchvision/prototype/models) directory and copy weights URLs (labelled as `ImageNet1K_V2`) from their respective models' files.
 
 ResNet:
 
