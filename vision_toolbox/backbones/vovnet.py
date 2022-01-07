@@ -30,7 +30,8 @@ configs = {
         "num_blocks": (1, 1, 1, 1),
         "stage_channels": _stage_channels,
         "num_layers": (3, 3, 3, 3),
-        "out_channels": _out_channels
+        "out_channels": _out_channels,
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19-4410fc5f.pth"
     },
     "vovnet-39": {
         "stem_channels": (64, 64, 128),

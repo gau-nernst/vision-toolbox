@@ -2,6 +2,15 @@
 
 Backbones, necks, and useful modules for Vision tasks.
 
+## Installation
+
+Install PyTorch and torchvision from conda. Then install this GitHub repo directly
+
+```bash
+conda install pytorch torchvision cudatoolkit=11.3 -c pytorch
+pip install git+https://github.com/gau-nernst/vision-toolbox.git
+```
+
 ## Backbones
 
 Implemented backbones:
@@ -94,6 +103,7 @@ Implementation notes:
 Backbone       | Top-1 acc | #Params(M) | FLOPS(G)*
 ---------------|-----------|------------|----------
 VoVNet-19-slim | 70.7      | 2.65       | 4.77
+VoVNet-19      | 75.4      | 10.18      | 9.66
 VoVNet-39      | 78.1      | 25.18      | 15.57
 VoVNet-57      | 79.2      | 41.45      | 19.30
 VoVNet-99      |           | 69.52      | 34.43
