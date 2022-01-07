@@ -11,6 +11,17 @@ conda install pytorch torchvision cudatoolkit=11.3 -c pytorch
 pip install git+https://github.com/gau-nernst/vision-toolbox.git
 ```
 
+## Usage
+
+```python
+from vision_toolbox import backbones
+
+model = backbones.cspdarknet53(pretrained=True)
+model(inputs)                       # last feature map, stride 32
+model.forward_features(inputs)      # list of 5 feature maps, stride 2, 4, 8, 16, 32
+model.get_out_channels()            # channels of output feature maps
+```
+
 ## Backbones
 
 Implemented backbones:
@@ -48,12 +59,11 @@ Training recipe
 
 - Optimizer: SGD, learning rate = 0.5, weight decay = 2e-5, 100 epochs
 - LR schedule: Linear warmup for 5 epochs, then cosine annealing
-- Batch size: 1024 (512 per GPU, 2x RTX3090, DDP, no SyncBN)
+- Batch size: 1024
 - Augmentations: Random Resized Crop, Trivial Augmentation, Randome Erasing (p=0.1), CutMix (alpha=1.0), and MixUp (alpha=0.2). For each batch, either CutMix or MixUp is applied, but not both.
-  - Random Erasing, CutMix, and Mixup are removed for small models (Darknet-19, VoVNet-19-slim)
+  - Random Erasing, CutMix, and Mixup are removed for small models (Darknet-19, VoVNet-19-slim, VoVNet-19)
 - Label smoothing = 0.1
-- Train res: 176
-- Val resize: 232, Val crop: 224
+- FixRes: Train resized crop: 176, Val resize: 232, Val crop: 224
 - Mixed-precision training
 
 Note: All hyperparameters are adopted from torchvision's recipe, except number of epochs (600 in torchvision's vs 100 in mine). Since the training time is shorter, augmentations should be reduced. Model EMA is not used.
