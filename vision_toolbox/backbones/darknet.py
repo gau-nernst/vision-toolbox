@@ -14,19 +14,6 @@ __all__ = [
     "Darknet", "darknet19", "darknet53", "cspdarknet19", "cspdarknet53"
 ]
 
-configs = {
-    "darknet-19": {
-        "stem_channels": 32,
-        "num_blocks": (0, 1, 1, 2, 2),
-        "num_channels": (64, 128, 256, 512, 1024)
-    },
-    "darknet-53": {
-        "stem_channels": 32,
-        "num_blocks": (1, 2, 8, 8, 4),
-        "num_channels": (64, 128, 258, 512, 1024)
-    }
-}
-
 
 class DarknetBlock(nn.Module):
     def __init__(self, in_channels, expansion=0.5):
@@ -102,7 +89,37 @@ class Darknet(BaseBackbone):
         return outputs
 
 
-def darknet19(): return Darknet(**configs["darknet-19"], block_fn=DarknetStage)
-def darknet53(): return Darknet(**configs["darknet-53"], block_fn=DarknetStage)
-def cspdarknet19(): return Darknet(**configs["darknet-19"], block_fn=CSPDarknetStage)
-def cspdarknet53(): return Darknet(**configs["darknet-53"], block_fn=CSPDarknetStage)
+configs = {
+    "darknet-19": {
+        "stem_channels": 32,
+        "num_blocks": (0, 1, 1, 2, 2),
+        "num_channels": (64, 128, 256, 512, 1024),
+        "block_fn": DarknetStage,
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet19-da4bd7c9.pth"
+    },
+    "darknet-53": {
+        "stem_channels": 32,
+        "num_blocks": (1, 2, 8, 8, 4),
+        "num_channels": (64, 128, 258, 512, 1024),
+        "block_fn": DarknetStage,
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet53-2315d8ae.pth"
+    },
+    "cspdarknet-19": {
+        "stem_channels": 32,
+        "num_blocks": (0, 1, 1, 2, 2),
+        "num_channels": (64, 128, 256, 512, 1024),
+        "block_fn": CSPDarknetStage
+    },
+    "cspdarknet-53": {
+        "stem_channels": 32,
+        "num_blocks": (1, 2, 8, 8, 4),
+        "num_channels": (64, 128, 258, 512, 1024),
+        "block_fn": CSPDarknetStage,
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/cspdarknet53-cfb1eaf2.pth"
+    }
+}
+
+def darknet19(pretrained=False): return Darknet.from_config(configs["darknet-19"], pretrained=pretrained)
+def darknet53(pretrained=False): return Darknet.from_config(configs["darknet-53"], pretrained=pretrained)
+def cspdarknet19(pretrained=False): return Darknet.from_config(configs["cspdarknet-19"], pretrained=pretrained)
+def cspdarknet53(pretrained=False): return Darknet.from_config(configs["cspdarknet-53"], pretrained=pretrained)

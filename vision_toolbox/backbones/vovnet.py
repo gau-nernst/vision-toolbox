@@ -10,38 +10,50 @@ from ..components import ConvBnAct, ESEBlock
 
 
 __all__ = [
-    "VoVNet", "vovnet19_slim", "vovnet39", "vovnet57", "vovnet99"
+    "VoVNet", "vovnet19_slim", "vovnet19", "vovnet39", "vovnet57", "vovnet99"
 ]
 
 # https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py
+_stage_channels = (128, 160, 192, 224)
+_out_channels = (256, 512, 768, 1024)
 configs = {
     "vovnet-19-slim": {
         "stem_channels": (64, 64, 128),
         "num_blocks": (1, 1, 1, 1),
         "stage_channels": (64, 80, 96, 112),
         "num_layers": (3, 3, 3, 3),
-        "out_channels": (112, 256, 384, 512)
+        "out_channels": (112, 256, 384, 512),
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_slim-231d7449.pth"
+    },
+    "vovnet-19": {
+        "stem_channels": (64, 64, 128),
+        "num_blocks": (1, 1, 1, 1),
+        "stage_channels": _stage_channels,
+        "num_layers": (3, 3, 3, 3),
+        "out_channels": _out_channels
     },
     "vovnet-39": {
         "stem_channels": (64, 64, 128),
         "num_blocks": (1, 1, 2, 2),
-        "stage_channels": (128, 160, 192, 224),
+        "stage_channels": _stage_channels,
         "num_layers": (5, 5, 5, 5),
-        "out_channels": (256, 512, 768, 1024)
+        "out_channels": _out_channels,
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39-b73bdbe9.pth"
     },
     "vovnet-57": {
         "stem_channels": (64, 64, 128),
         "num_blocks": (1, 1, 4, 3),
-        "stage_channels": (128, 160, 192, 224),
+        "stage_channels": _stage_channels,
         "num_layers": (5, 5, 5, 5),
-        "out_channels": (256, 512, 768, 1024)
+        "out_channels": _out_channels,
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57-630a88d1.pth"
     },
     "vovnet-99": {
         "stem_channels": (64, 64, 128),
         "num_blocks": (1, 3, 9, 3),
-        "stage_channels": (128, 160, 192, 224),
+        "stage_channels": _stage_channels,
         "num_layers": (5, 5, 5, 5),
-        "out_channels": (256, 512, 768, 1024)
+        "out_channels": _out_channels
     }
 }
 
@@ -111,7 +123,8 @@ class VoVNet(BaseBackbone):
         return outputs
 
 
-def vovnet19_slim(**kwargs): return VoVNet(**configs["vovnet-19-slim"], **kwargs)
-def vovnet39(**kwargs): return VoVNet(**configs["vovnet-39"], **kwargs)
-def vovnet57(**kwargs): return VoVNet(**configs["vovnet-57"], **kwargs)
-def vovnet99(**kwargs): return VoVNet(**configs["vovnet-99"], **kwargs)
+def vovnet19_slim(pretrained=False): return VoVNet.from_config(configs["vovnet-19-slim"], pretrained=pretrained)
+def vovnet19(pretrained=False): return VoVNet.from_config(configs["vovnet-19"], pretrained=pretrained)
+def vovnet39(pretrained=False): return VoVNet.from_config(configs["vovnet-39"], pretrained=pretrained)
+def vovnet57(pretrained=False): return VoVNet.from_config(configs["vovnet-57"], pretrained=pretrained)
+def vovnet99(pretrained=False): return VoVNet.from_config(configs["vovnet-99"], pretrained=pretrained)
