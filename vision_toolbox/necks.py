@@ -49,7 +49,7 @@ class FPN(nn.Module):
         super().__init__()
         self.fuse = _fuse_functions[fuse_fn]
         self.out_channels = out_channels
-        self.stride = 2**len(in_channels)
+        self.stride = 2**(len(in_channels)-1)
 
         if lateral_block is None:
             lateral_block = partial(ConvBnAct, kernel_size=1, padding=0)
