@@ -49,6 +49,7 @@ class FPN(nn.Module):
         super().__init__()
         self.fuse = _fuse_functions[fuse_fn]
         self.out_channels = out_channels
+        self.stride = 2**len(in_channels)
 
         if lateral_block is None:
             lateral_block = partial(ConvBnAct, kernel_size=1, padding=0)
@@ -89,6 +90,8 @@ class SemanticFPN(nn.Module):
         assert fuse_fn in ("sum", "concat")
         super().__init__()
         self.aggregate = _aggregate_functions[agg_fn]
+        self.out_channels = out_channels * len(in_channels) if agg_fn == "concat" else out_channels
+        self.stride = 2**len(in_channels)
 
         if lateral_block is None:
             lateral_block = partial(ConvBnAct, kernel_size=1, padding=0)
@@ -125,7 +128,8 @@ class PAN(nn.Module):
         super().__init__()
         self.fuse = _fuse_functions[fuse_fn]
         self.aggregate = _aggregate_functions[agg_fn]
-        self.out_channels = out_channels
+        self.out_channels = out_channels * len(in_channels) if agg_fn == "concat" else out_channels
+        self.stride = 2**len(in_channels)
 
         if lateral_block is None:
             lateral_block = partial(ConvBnAct, kernel_size=1, padding=0)
