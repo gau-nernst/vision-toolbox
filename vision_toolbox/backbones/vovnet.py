@@ -99,9 +99,12 @@ class OSAStage(nn.Sequential):
 
 class VoVNet(BaseBackbone):
     # to make VoVNetV1, pass residual=False and ese=False
-    def __init__(self, stem_channels, num_blocks, stage_channels, num_layers, out_channels, residual=True, ese=True):
+    def __init__(self, stem_channels, num_blocks, stage_channels, num_layers, out_channels, residual=True, ese=True, num_returns=4):
         super().__init__()
-        self.out_channels = tuple(out_channels)
+        self.out_channels = tuple(out_channels)[-num_returns:]
+        self.stride = 32
+        self.num_returns = num_returns
+        
         self.stem = nn.Sequential()
         in_c = 3
         for i, c in enumerate(stem_channels):
@@ -120,12 +123,12 @@ class VoVNet(BaseBackbone):
         for s in self.stages:
             out = s(out)
             outputs.append(out)
+        
+        return outputs[-self.num_returns:]
 
-        return outputs
 
-
-def vovnet19_slim(pretrained=False): return VoVNet.from_config(configs["vovnet-19-slim"], pretrained=pretrained)
-def vovnet19(pretrained=False): return VoVNet.from_config(configs["vovnet-19"], pretrained=pretrained)
-def vovnet39(pretrained=False): return VoVNet.from_config(configs["vovnet-39"], pretrained=pretrained)
-def vovnet57(pretrained=False): return VoVNet.from_config(configs["vovnet-57"], pretrained=pretrained)
-def vovnet99(pretrained=False): return VoVNet.from_config(configs["vovnet-99"], pretrained=pretrained)
+def vovnet19_slim(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-19-slim"], pretrained=pretrained, **kwargs)
+def vovnet19(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-19"], pretrained=pretrained, **kwargs)
+def vovnet39(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-39"], pretrained=pretrained, **kwargs)
+def vovnet57(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-57"], pretrained=pretrained, **kwargs)
+def vovnet99(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-99"], pretrained=pretrained, **kwargs)

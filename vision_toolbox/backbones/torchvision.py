@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 from torchvision.models import resnet, mobilenet, efficientnet
 from torchvision.models.feature_extraction import create_feature_extractor
@@ -16,68 +18,67 @@ __all__ = [
 
 
 class _ExtractorBackbone(BaseBackbone):
-    def __init__(self, backbone, node_names):
+    def __init__(self, backbone, node_names, num_returns=4):
         super().__init__()
-        self.feat_extractor = create_feature_extractor(backbone, node_names)
-
+        self.feat_extractor = create_feature_extractor(backbone, node_names[-num_returns:])
         self.feat_extractor.eval()
         with torch.no_grad():
             out_channels = [x.shape[1] for x in self.feat_extractor(torch.rand(1,3,224,224)).values()]
+        
         self.out_channels = tuple(out_channels)
+        self.stride = 32
 
-    def forward_features(self, x):
+    def forward_features(self, x: torch.Tensor) -> List[torch.Tensor]:
         return list(self.feat_extractor(x).values())
 
 
 class ResNetExtractor(_ExtractorBackbone):
-    def __init__(self, name, pretrained=False):
+    def __init__(self, name, pretrained=False, **kwargs):
         backbone = resnet.__dict__[name](pretrained=pretrained, progress=False)
         node_names = ["relu", "layer1", "layer2", "layer3", "layer4"]
-        super().__init__(backbone, node_names)
+        super().__init__(backbone, node_names, **kwargs)
 
 
 class MobileNetExtractor(_ExtractorBackbone):
-    def __init__(self, name, pretrained=False):
+    def __init__(self, name, pretrained=False, **kwargs):
         backbone = mobilenet.__dict__[name](pretrained=pretrained, progress=False)
-        
+        block_name = "conv" if name == "mobilenet_v2" else "block"
+
         # take output at expansion 1x1 conv
         stage_indices = [i for i, b in enumerate(backbone.features) if getattr(b, "_is_cn", False)]
-        block_name = "conv" if name == "mobilenet_v2" else "block"
         node_names = [f"features.{i}.{block_name}.0" for i in stage_indices] + [f"features.{len(backbone.features)-1}"]
-
-        super().__init__(backbone, node_names)
+        super().__init__(backbone, node_names, **kwargs)
 
 
 class EfficientNetExtractor(_ExtractorBackbone):
-    def __init__(self, name, pretrained=False):
+    def __init__(self, name, pretrained=False, **kwargs):
         backbone = efficientnet.__dict__[name](pretrained=pretrained, progress=False)
 
         # take output at expansion 1x1 conv
         stage_indices = [2, 3, 4, 6]
         node_names = [f"features.{i}.0.block.0" for i in stage_indices] + [f"features.{len(backbone.features)-1}"]
+        super().__init__(backbone, node_names, **kwargs)
 
-        super().__init__(backbone, node_names)
 
+def resnet18(pretrained=False, **kwargs): return ResNetExtractor("resnet18", pretrained=pretrained, **kwargs)
+def resnet34(pretrained=False, **kwargs): return ResNetExtractor("resnet34", pretrained=pretrained, **kwargs)
+def resnet50(pretrained=False, **kwargs): return ResNetExtractor("resnet50", pretrained=pretrained, **kwargs)
+def resnet101(pretrained=False, **kwargs): return ResNetExtractor("resnet101", pretrained=pretrained, **kwargs)
+def resnet152(pretrained=False, **kwargs): return ResNetExtractor("resnet152", pretrained=pretrained, **kwargs)
+def resnext50_32x4d(pretrained=False, **kwargs): return ResNetExtractor("resnext50_32x4d", pretrained=pretrained, **kwargs)
+def resnext101_32x8d(pretrained=False, **kwargs): return ResNetExtractor("resnext101_32x8d", pretrained=pretrained, **kwargs)
+def wide_resnet50_2(pretrained=False, **kwargs): return ResNetExtractor("wide_resnet50_2", pretrained=pretrained, **kwargs)
+def wide_resnet101_2(pretrained=False, **kwargs): return ResNetExtractor("wide_resnet101_2", pretrained=pretrained, **kwargs)
 
-def resnet18(pretrained=False): return ResNetExtractor("resnet18", pretrained=pretrained)
-def resnet34(pretrained=False): return ResNetExtractor("resnet34", pretrained=pretrained)
-def resnet50(pretrained=False): return ResNetExtractor("resnet50", pretrained=pretrained)
-def resnet101(pretrained=False): return ResNetExtractor("resnet101", pretrained=pretrained)
-def resnet152(pretrained=False): return ResNetExtractor("resnet152", pretrained=pretrained)
-def resnext50_32x4d(pretrained=False): return ResNetExtractor("resnext50_32x4d", pretrained=pretrained)
-def resnext101_32x8d(pretrained=False): return ResNetExtractor("resnext101_32x8d", pretrained=pretrained)
-def wide_resnet50_2(pretrained=False): return ResNetExtractor("wide_resnet50_2", pretrained=pretrained)
-def wide_resnet101_2(pretrained=False): return ResNetExtractor("wide_resnet101_2", pretrained=pretrained)
+def mobilenet_v2(pretrained=False, **kwargs): return MobileNetExtractor("mobilenet_v2", pretrained=pretrained, **kwargs)
+def mobilenet_v3_large(pretrained=False, **kwargs): return MobileNetExtractor("mobilenet_v3_large", pretrained=pretrained, **kwargs)
+def mobilenet_v3_small(pretrained=False, **kwargs): return MobileNetExtractor("mobilenet_v3_small", pretrained=pretrained, **kwargs)
 
-def mobilenet_v2(pretrained=False): return MobileNetExtractor("mobilenet_v2", pretrained=pretrained)
-def mobilenet_v3_large(pretrained=False): return MobileNetExtractor("mobilenet_v3_large", pretrained=pretrained)
-def mobilenet_v3_small(pretrained=False): return MobileNetExtractor("mobilenet_v3_small", pretrained=pretrained)
-
-def efficientnet_b0(pretrained=False): return EfficientNetExtractor("efficientnet_b0", pretrained=pretrained)
-def efficientnet_b1(pretrained=False): return EfficientNetExtractor("efficientnet_b1", pretrained=pretrained)
-def efficientnet_b2(pretrained=False): return EfficientNetExtractor("efficientnet_b2", pretrained=pretrained)
-def efficientnet_b3(pretrained=False): return EfficientNetExtractor("efficientnet_b3", pretrained=pretrained)
-def efficientnet_b4(pretrained=False): return EfficientNetExtractor("efficientnet_b4", pretrained=pretrained)
-def efficientnet_b5(pretrained=False): return EfficientNetExtractor("efficientnet_b5", pretrained=pretrained)
-def efficientnet_b6(pretrained=False): return EfficientNetExtractor("efficientnet_b6", pretrained=pretrained)
-def efficientnet_b7(pretrained=False): return EfficientNetExtractor("efficientnet_b7", pretrained=pretrained)
+def efficientnet_b0(pretrained=False, **kwargs): return EfficientNetExtractor("efficientnet_b0", pretrained=pretrained, **kwargs)
+def efficientnet_b1(pretrained=False, **kwargs): return EfficientNetExtractor("efficientnet_b1", pretrained=pretrained, **kwargs)
+def efficientnet_b2(pretrained=False, **kwargs): return EfficientNetExtractor("efficientnet_b2", pretrained=pretrained, **kwargs)
+def efficientnet_b3(pretrained=False, **kwargs): return EfficientNetExtractor("efficientnet_b3", pretrained=pretrained, **kwargs)
+def efficientnet_b4(pretrained=False, **kwargs): return EfficientNetExtractor("efficientnet_b4", pretrained=pretrained, **kwargs)
+def efficientnet_b5(pretrained=False, **kwargs): return EfficientNetExtractor("efficientnet_b5", pretrained=pretrained, **kwargs)
+def efficientnet_b6(pretrained=False, **kwargs): return EfficientNetExtractor("efficientnet_b6", pretrained=pretrained, **kwargs)
+def efficientnet_b7(pretrained=False, **kwargs): return EfficientNetExtractor("efficientnet_b7", pretrained=pretrained, **kwargs)

@@ -1,4 +1,4 @@
-from typing import Tuple, Dict
+from typing import Tuple, Dict, List
 from abc import ABCMeta, abstractmethod
 
 import torch
@@ -7,20 +7,25 @@ from torch.hub import load_state_dict_from_url
 
 
 class BaseBackbone(nn.Module, metaclass=ABCMeta):
+    @abstractmethod
+    def forward_features(self, x: torch.Tensor) -> List[torch.Tensor]:
+        pass
+
     def forward(self, x):
         return self.forward_features(x)[-1]
-
-    @abstractmethod
-    def forward_features(self, x: torch.Tensor) -> Tuple[torch.Tensor]:
-        pass
 
     def get_out_channels(self) -> Tuple[int]:
         return self.out_channels
 
+    def get_stride(self) -> int:
+        return self.stride
+
     @classmethod
-    def from_config(cls, config: Dict, pretrained: bool=False):
+    def from_config(cls, config: Dict, pretrained: bool=False, **kwargs):
         weights = config.pop("weights", None)
-        model = cls(**config)
+        model = cls(**config, **kwargs)
         if pretrained and weights is not None:
-            model.load_state_dict(load_state_dict_from_url(weights))
+            state_dict = load_state_dict_from_url(weights)
+            model.load_state_dict(state_dict)
+        
         return model

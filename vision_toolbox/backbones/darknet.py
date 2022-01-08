@@ -66,27 +66,30 @@ class CSPDarknetStage(nn.Module):
 
 
 class Darknet(BaseBackbone):
-    def __init__(self, stem_channels, num_blocks, num_channels, block_fn=None):
+    def __init__(self, stem_channels, num_blocks, num_channels, block_fn=None, num_returns=4):
         super().__init__()
         if block_fn is None:
             block_fn = DarknetStage
         
-        self.out_channels = tuple(num_channels)
+        self.out_channels = tuple(num_channels)[-num_returns:]
+        self.stride = 32
+        self.num_returns = num_returns
+
         self.stem = ConvBnAct(3, stem_channels)
-        
         self.stages = nn.ModuleList()
         in_c = stem_channels
         for n, c in zip(num_blocks, num_channels):
             self.stages.append(block_fn(n, in_c, c) if n > 0 else ConvBnAct(in_c, c, stride=2))
             in_c = c
-
+        
     def forward_features(self, x):
         outputs = []
         out = self.stem(x)
         for s in self.stages:
             out = s(out)
             outputs.append(out)
-        return outputs
+        
+        return outputs[-self.num_returns:]
 
 
 configs = {
@@ -119,7 +122,7 @@ configs = {
     }
 }
 
-def darknet19(pretrained=False): return Darknet.from_config(configs["darknet-19"], pretrained=pretrained)
-def darknet53(pretrained=False): return Darknet.from_config(configs["darknet-53"], pretrained=pretrained)
-def cspdarknet19(pretrained=False): return Darknet.from_config(configs["cspdarknet-19"], pretrained=pretrained)
-def cspdarknet53(pretrained=False): return Darknet.from_config(configs["cspdarknet-53"], pretrained=pretrained)
+def darknet19(pretrained=False, **kwargs): return Darknet.from_config(configs["darknet-19"], pretrained=pretrained, **kwargs)
+def darknet53(pretrained=False, **kwargs): return Darknet.from_config(configs["darknet-53"], pretrained=pretrained, **kwargs)
+def cspdarknet19(pretrained=False, **kwargs): return Darknet.from_config(configs["cspdarknet-19"], pretrained=pretrained, **kwargs)
+def cspdarknet53(pretrained=False, **kwargs): return Darknet.from_config(configs["cspdarknet-53"], pretrained=pretrained, **kwargs)
