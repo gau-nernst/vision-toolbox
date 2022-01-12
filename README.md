@@ -68,9 +68,10 @@ Training recipe
 
 Note: All hyperparameters are adopted from torchvision's recipe, except number of epochs (600 in torchvision's vs 100 in mine). Since the training time is shorter, augmentations should be reduced. Model EMA is not used.
 
-PyTorch Lightning is used to train the models (see `classifier.py`). The easiest way to run training is to use Lightning CLI with a config file (see below). Note that PyTorch Lightning is not required to create, run, and load the models.
+PyTorch Lightning is used to train the models (see `classifier.py`). The easiest way to run training is to use Lightning CLI with a config file (see below, `jsonargparse[signatures]` is required). Note that PyTorch Lightning is not required to create, run, and load the models.
 
 ```bash
+pip install pytorch-lightning jsonargparse[signatures]    # dependencies for Lightning CLI
 python train.py fit --config config.yaml
 ```
 
@@ -168,3 +169,22 @@ EfficientNet B7   | 84.1       | 63.79      | 10.53
 *FLOPS is measured with `(1,3,224,224)` input.
 
 ^Top-1 accuracy is copied from [torchvision's documentation](https://pytorch.org/vision/stable/models.html) (0.11.0 at the time of writing)
+
+## Necks
+
+- [FPN](https://arxiv.org/abs/1612.03144)
+- [SemanticFPN](https://arxiv.org/abs/1901.02446)
+- [PAN](https://arxiv.org/abs/1803.01534)
+- [BiFPN](https://arxiv.org/abs/1911.09070)
+
+Implementation notes
+
+- FPN: no batch norm and activation are used in lateral connections. Output convolutions (with batch norm and ReLU) are inside the top-down path..
+
+  ```python
+  P5 = lateral_conv5(C5)
+  P4 = out_conv4(lateral_conv4(C4) + upsample(P5))
+  P3 = out_conv4(lateral_conv4(C3) + upsample(P4))
+  ```
+
+- BiFPN: weighted fusion is not implemented. Normal 3x3 convolutions (with batch norm and ReLU) are used by default.

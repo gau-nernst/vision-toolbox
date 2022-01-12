@@ -1,3 +1,4 @@
+from abc import ABCMeta
 from typing import List
 from functools import partial
 
@@ -8,16 +9,17 @@ import torch.nn.functional as F
 from .components import ConvBnAct
 
 
-def aggregate_sum(x: List[torch.Tensor]):
+# support torchscript
+def aggregate_sum(x: List[torch.Tensor]) -> torch.Tensor:
     out = x[0]
     for o in x[1:]:
-        out += o
+        out = out + o
     return out
 
-def aggregate_avg(x: List[torch.Tensor]):
+def aggregate_avg(x: List[torch.Tensor]) -> torch.Tensor:
     return aggregate_sum(x) / len(x)
 
-def aggregate_max(x: List[torch.Tensor]):
+def aggregate_max(x: List[torch.Tensor]) -> torch.Tensor:
     out = x[0]
     for o in x[1:]:
         out = torch.maximum(out, o)
@@ -30,83 +32,60 @@ _aggregate_functions = {
     "max": aggregate_max
 }
 
-def fuse_sum(x1, x2):
-    return x1 + x2
 
-def fuse_concat(x1, x2):
-    return torch.cat((x1, x2), dim=1)
+class BaseNeck(nn.Module, metaclass=ABCMeta):
+    def forward_features(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+        pass
 
-_fuse_functions = {
-    "sum": fuse_sum,
-    "concat": fuse_concat
-}
+    def get_out_channels(self) -> int:
+        return self.out_channels
 
 
-class FPN(nn.Module):
+class FPN(BaseNeck):
     # https://arxiv.org/abs/1612.03144
-    def __init__(self, in_channels, out_channels=256, fuse_fn="sum", lateral_block=None, output_block=None):
-        assert fuse_fn in ("sum", "concat")
+    def __init__(self, in_channels, out_channels=256, fuse_fn="sum", block=ConvBnAct):
         super().__init__()
-        self.fuse = _fuse_functions[fuse_fn]
+        self.fuse = _aggregate_functions[fuse_fn]
         self.out_channels = out_channels
         self.stride = 2**(len(in_channels)-1)
 
-        if lateral_block is None:
-            lateral_block = partial(ConvBnAct, kernel_size=1, padding=0)
-        if output_block is None:
-            output_block = ConvBnAct
-
-        lateral_convs = [lateral_block(in_c, out_channels) for in_c in in_channels]
-        self.lateral_convs = nn.ModuleList(lateral_convs)
+        self.lateral_convs = nn.ModuleList([nn.Conv2d(in_c, out_channels, kernel_size=1) for in_c in in_channels])
         
         in_c = out_channels if fuse_fn == "sum" else out_channels * 2
-        output_convs = [output_block(in_c, out_channels) for _ in range(len(in_channels)-1)]
-        self.output_convs = nn.ModuleList(output_convs)
+        self.output_convs = nn.ModuleList([block(in_c, out_channels) for _ in range(len(in_channels)-1)])
 
     def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
         return self.forward_features(x)[0]
 
     def forward_features(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
-        laterals = []
-        for i, l_conv in enumerate(self.lateral_convs):
-            laterals.append(l_conv(x[i]))
-
-        out = laterals.pop()
-        outputs = [out]
+        laterals = [l_conv(x[i]) for i, l_conv in enumerate(self.lateral_convs)]
+        outputs = [laterals.pop()]
         
         for o_conv in self.output_convs:
-            out = F.interpolate(out, scale_factor=2., mode="nearest")
-            lat = laterals.pop()
-
-            out = self.fuse(out, lat)
-            out = o_conv(out)
-            outputs.append(out)
+            out = F.interpolate(outputs[-1], scale_factor=2., mode="nearest")
+            out = self.fuse([out, laterals.pop()])
+            outputs.append(o_conv(out))
 
         return outputs[::-1]
 
-class SemanticFPN(nn.Module):
+
+class SemanticFPN(BaseNeck):
     # https://arxiv.org/abs/1901.02446
-    def __init__(self, in_channels, fpn_channels=256, out_channels=128, fuse_fn="sum", agg_fn="sum", lateral_block=None, output_block=None):
-        assert fuse_fn in ("sum", "concat")
+    def __init__(self, in_channels, fpn_channels=256, out_channels=128, fuse_fn="sum", agg_fn="sum", block=ConvBnAct):
         super().__init__()
         self.aggregate = _aggregate_functions[agg_fn]
         self.out_channels = out_channels * len(in_channels) if agg_fn == "concat" else out_channels
         self.stride = 2**len(in_channels)
 
-        if lateral_block is None:
-            lateral_block = partial(ConvBnAct, kernel_size=1, padding=0)
-        if output_block is None:
-            output_block = ConvBnAct
-
-        self.fpn = FPN(in_channels, out_channels=fpn_channels, fuse_fn=fuse_fn, lateral_block=lateral_block, output_block=output_block)
+        self.fpn = FPN(in_channels, out_channels=fpn_channels, fuse_fn=fuse_fn, block=block)
    
         self.upsamples = nn.ModuleList()
-        self.upsamples.append(output_block(fpn_channels, out_channels))
+        self.upsamples.append(block(fpn_channels, out_channels))        # no upsample for bottom-most feature map
         for i in range(1, len(in_channels)):
             up = []
             for j in range(i):
                 in_c = fpn_channels if j == 0 else out_channels
-                up.append(output_block(in_c, out_channels))
+                up.append(block(in_c, out_channels))
                 up.append(nn.Upsample(scale_factor=2, mode="bilinear"))
             
             up = nn.Sequential(*up)
@@ -121,38 +100,26 @@ class SemanticFPN(nn.Module):
         outputs = [up(outputs[i]) for i, up in enumerate(self.upsamples)]
         return outputs
 
-class PAN(nn.Module):
+class PAN(BaseNeck):
     # https://arxiv.org/abs/1803.01534
-    def __init__(self, in_channels, out_channels=256, lateral_block=None, output_block=None, downsample_block=None, fuse_fn="sum", agg_fn="max"):
-        assert fuse_fn in ("sum", "concat")
+    def __init__(self, in_channels, out_channels=256, fuse_fn="sum", agg_fn="max", block=ConvBnAct):
         super().__init__()
-        self.fuse = _fuse_functions[fuse_fn]
+        self.fuse = _aggregate_functions[fuse_fn]
         self.aggregate = _aggregate_functions[agg_fn]
         self.out_channels = out_channels * len(in_channels) if agg_fn == "concat" else out_channels
         self.stride = 2**len(in_channels)
 
-        if lateral_block is None:
-            lateral_block = partial(ConvBnAct, kernel_size=1, padding=0)
-        if output_block is None:
-            output_block = ConvBnAct
-        if downsample_block is None:
-            downsample_block = partial(ConvBnAct, stride=2)
-
-        self.fpn = FPN(in_channels, out_channels=out_channels, lateral_block=lateral_block, output_block=output_block, fuse_fn=fuse_fn)
-
-        downsample_convs = [downsample_block(out_channels, out_channels) for _ in range(len(in_channels)-1)]
-        self.downsample_convs = nn.ModuleList(downsample_convs)
+        self.fpn = FPN(in_channels, out_channels=out_channels, fuse_fn=fuse_fn, block=block)
+        self.downsample_convs = nn.ModuleList([block(out_channels, out_channels, stride=2) for _ in range(len(in_channels)-1)])
 
         in_c = out_channels if fuse_fn == "sum" else out_channels * 2
-        output_convs = [output_block(in_c, out_channels) for _ in range(len(in_channels)-1)]
-        self.output_convs = nn.ModuleList(output_convs)
+        self.output_convs = nn.ModuleList([block(in_c, out_channels) for _ in range(len(in_channels)-1)])
 
     def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
         outputs = self.forward_features(x)
-        output_dim = outputs[0].shape[2:]
         for i in range(1, len(outputs)):
-            outputs[i] = F.interpolate(outputs[i], output_dim, mode="nearest")
-    
+            outputs[i] = F.interpolate(outputs[i], scale_factor=2**i, mode="nearest")
+
         return self.aggregate(outputs)
 
     def forward_features(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
@@ -162,17 +129,64 @@ class PAN(nn.Module):
 
         for d_conv, o_conv in zip(self.downsample_convs, self.output_convs):
             out = d_conv(out)
-            fpn_out = fpn_outputs.pop()
-            
-            out = self.fuse(out, fpn_out)
+            out = self.fuse([out, fpn_outputs.pop()])
             out = o_conv(out)
             outputs.append(out)
         
         return outputs
 
-class BiFPNBlock(nn.Module):
-    pass
 
-class BiFPN(nn.Module):
+class BiFPNLayer(nn.Module):
+    def __init__(self, num_levels, channels, fuse_fn="sum", block=ConvBnAct):
+        super().__init__()
+        self.fuse = _aggregate_functions[fuse_fn]
+
+        if fuse_fn == "sum":
+            self.inter_convs = nn.ModuleList([block(channels, channels) for _ in range(num_levels-1)])
+            self.output_convs = nn.ModuleList([block(channels, channels) for _ in range(num_levels-1)])
+
+        else:
+            self.inter_convs = nn.ModuleList([block(2*channels, channels) for _ in range(num_levels-1)])    # fuse 2 feature maps
+            self.output_convs = nn.ModuleList([block(3*channels, channels) for _ in range(num_levels-2)])   # fuse 3 feature maps
+            self.output_convs.append(block(2*channels, channels))                   # only fuse 2 feature maps for top-most level
+
+    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+        # top-down
+        inters = [x[-1]]                                                        # P7in
+        for i, conv in enumerate(self.inter_convs):
+            out = F.interpolate(inters[-1], scale_factor=2., mode="nearest")    # resize(P7td)
+            out = self.fuse([x[-2-i], out])                                     # P6in + resize(P7td)
+            inters.append(conv(out))                                            # P6td = conv(P6in + resize(P7td))
+            
+        # bottom-up
+        inters = inters[::-1]           # feature maps from bottom to top, same order as input x
+        outputs = [inters[0]]
+        for i, conv in enumerate(self.output_convs):
+            out = F.interpolate(outputs[-1], scale_factor=0.5, mode="nearest")  # resize(P3td)
+            if i < len(self.output_convs) - 1:
+                out = self.fuse([x[i+1], inters[i+1], out])                     # P4in + P4td + resize(P3td)
+            else:
+                out = self.fuse([inters[i+1], out])                             # P7in + resize(P6td)
+            outputs.append(conv(out))                                           # P4out = conv(P4in + P4td + resize(P3td))
+
+        return outputs
+
+
+class BiFPN(BaseNeck):
     # https://arxiv.org/pdf/1911.09070.pdf
-    pass
+    # https://github.com/google/automl/blob/master/efficientdet/efficientdet_arch.py
+    def __init__(self, in_channels, out_channels=64, num_layers=1, fuse_fn="sum", block=ConvBnAct):
+        super().__init__()
+        self.laterals = nn.ModuleList([nn.Conv2d(in_c, out_channels, kernel_size=1) for in_c in in_channels])
+        self.layers = nn.ModuleList([BiFPNLayer(len(in_channels), out_channels, fuse_fn=fuse_fn, block=block) for _ in range(num_layers)])
+
+        self.out_channels = out_channels
+
+    def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
+        return self.forward_features(x)[0]
+
+    def forward_features(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+        outputs = [l_conv(x[i]) for i, l_conv in enumerate(self.laterals)]
+        for bifpn_layer in self.layers:
+            outputs = bifpn_layer(outputs)        
+        return outputs
