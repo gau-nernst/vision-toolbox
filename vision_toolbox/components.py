@@ -2,6 +2,13 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+
+__all__ = [
+    'ConvBnAct', 'SeparableConv2d', 'DeformableConv2d',
+    'ESEBlock', 'SPPBlock'
+]
+
+
 # torchvision.ops.misc.ConvNormActivation initializes weights differently
 class ConvBnAct(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, act_fn=nn.ReLU):
@@ -13,7 +20,7 @@ class ConvBnAct(nn.Sequential):
             nn.init.kaiming_normal_(self.conv.weight, a=getattr(self.act, "negative_slop", 0), mode="fan_out")
 
 
-class SeperableConv2d(nn.Sequential):
+class SeparableConv2d(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, dilation=1, act_fn=nn.ReLU6):
         super().__init__()
         self.dw = ConvBnAct(in_channels, in_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=in_channels, act_fn=act_fn)

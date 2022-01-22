@@ -123,7 +123,7 @@ VoVNet-99      |           | 69.52      | 34.43
 
 ### torchvision
 
-Some torchvision classification models are ported to use with the toolbox. They can output multiple feature map levels.
+Some torchvision classification models are ported to use with the toolbox. They can output multiple feature map levels. `torchvision>=0.11.0` is required since its feature extraction API is used to do this.
 
 - For MobileNet and EfficientNet models, intermediate outputs are taken after the first 1x1 conv expansion layer of the strided MBConv block. See Section 6.2 of [MobileNetv2 paper](https://arxiv.org/abs/1801.04381) and Section 6.3 of [MobileNetv3 paper](https://arxiv.org/abs/1905.02244).
 - To use weights from the new PyTorch training recipe, go to torchvision's [prototype](https://github.com/pytorch/vision/tree/main/torchvision/prototype/models) directory and copy weights URLs (labelled as `ImageNet1K_V2`) from their respective models' files.

@@ -9,6 +9,11 @@ import torch.nn.functional as F
 from .components import ConvBnAct
 
 
+__all__ = [
+    'BaseNeck', 'FPN', 'SemanticFPN', 'PAN', 'BiFPN'
+]
+
+
 # support torchscript
 def aggregate_sum(x: List[torch.Tensor]) -> torch.Tensor:
     out = x[0]
@@ -71,10 +76,10 @@ class FPN(BaseNeck):
 
 class SemanticFPN(BaseNeck):
     # https://arxiv.org/abs/1901.02446
-    def __init__(self, in_channels, fpn_channels=256, out_channels=128, fuse_fn="sum", agg_fn="sum", block=ConvBnAct):
+    def __init__(self, in_channels, fpn_channels=256, out_channels=128, fuse_fn="sum", pool_fn="sum", block=ConvBnAct):
         super().__init__()
-        self.aggregate = _aggregate_functions[agg_fn]
-        self.out_channels = out_channels * len(in_channels) if agg_fn == "concat" else out_channels
+        self.pool = _aggregate_functions[pool_fn]
+        self.out_channels = out_channels * len(in_channels) if pool_fn == "concat" else out_channels
         self.stride = 2**len(in_channels)
 
         self.fpn = FPN(in_channels, out_channels=fpn_channels, fuse_fn=fuse_fn, block=block)
@@ -93,7 +98,7 @@ class SemanticFPN(BaseNeck):
 
     def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
         outputs = self.forward_features(x)
-        return self.aggregate(outputs)
+        return self.pool(outputs)
 
     def forward_features(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
         outputs = self.fpn.forward_features(x)
@@ -102,11 +107,11 @@ class SemanticFPN(BaseNeck):
 
 class PAN(BaseNeck):
     # https://arxiv.org/abs/1803.01534
-    def __init__(self, in_channels, out_channels=256, fuse_fn="sum", agg_fn="max", block=ConvBnAct):
+    def __init__(self, in_channels, out_channels=256, fuse_fn="sum", pool_fn="max", block=ConvBnAct):
         super().__init__()
         self.fuse = _aggregate_functions[fuse_fn]
-        self.aggregate = _aggregate_functions[agg_fn]
-        self.out_channels = out_channels * len(in_channels) if agg_fn == "concat" else out_channels
+        self.pool = _aggregate_functions[pool_fn]
+        self.out_channels = out_channels * len(in_channels) if pool_fn == "concat" else out_channels
         self.stride = 2**len(in_channels)
 
         self.fpn = FPN(in_channels, out_channels=out_channels, fuse_fn=fuse_fn, block=block)
@@ -120,7 +125,7 @@ class PAN(BaseNeck):
         for i in range(1, len(outputs)):
             outputs[i] = F.interpolate(outputs[i], scale_factor=2**i, mode="nearest")
 
-        return self.aggregate(outputs)
+        return self.pool(outputs)
 
     def forward_features(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
         fpn_outputs = self.fpn.forward_features(x)[::-1]        # top to bottom, so that .pop() is the bottom

@@ -1,8 +1,13 @@
 from typing import List
+import warnings
 
 import torch
 from torchvision.models import resnet, mobilenet, efficientnet
-from torchvision.models.feature_extraction import create_feature_extractor
+try:
+    from torchvision.models.feature_extraction import create_feature_extractor
+except ImportError:
+    warnings.warn('Cannot import feature_extraction module. Torchvision models won\'t be available. Update to torchvision>=0.11.0 to use torchvision models.')
+    create_feature_extractor = None
 
 from .base import BaseBackbone
 
