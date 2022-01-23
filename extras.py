@@ -151,7 +151,7 @@ def profile(module: nn.Module, input: torch.Tensor=None, n: int=10, device="cpu"
     tb *= 1000 / n
     
     mem = torch.cuda.memory_reserved(device) / 1e9 if torch.cuda.is_available() else 0    # GB
-    params = sum(list(x.numel() for x in module.parameters())) / 1e6            # M
+    params = sum([x.numel() for x in module.parameters()]) / 1e6    # M
     torch.cuda.empty_cache()
 
     return params, flops, mem, tf, tb
