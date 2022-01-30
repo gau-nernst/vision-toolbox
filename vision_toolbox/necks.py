@@ -15,10 +15,13 @@ __all__ = [
 
 
 # support torchscript
+def aggregate_concat(x: List[torch.Tensor]) -> torch.Tensor:
+    return torch.concat(x, dim=1)       # torchscript does not support partial
+
 def aggregate_sum(x: List[torch.Tensor]) -> torch.Tensor:
     out = x[0]
     for o in x[1:]:
-        out = out + o
+        out = out + o       # += will do inplace addition
     return out
 
 def aggregate_avg(x: List[torch.Tensor]) -> torch.Tensor:
@@ -31,7 +34,7 @@ def aggregate_max(x: List[torch.Tensor]) -> torch.Tensor:
     return out
 
 _aggregate_functions = {
-    "concat": partial(torch.concat, dim=1),
+    "concat": aggregate_concat,
     "sum": aggregate_sum,
     "avg": aggregate_avg,
     "max": aggregate_max
