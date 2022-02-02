@@ -1,39 +1,6 @@
 model:
-  backbone: vovnet19_slim
-  num_classes: 1000
-
-  train_dir: datasets/ImageNet/ILSVRC/Data/CLS-LOC/train
-  val_dir: datasets/ImageNet/ILSVRC/Data/CLS-LOC/val
-
-  batch_size: 512
-  num_workers: 8
-
-  optimizer: SGD
-  lr: 0.5
-  weight_decay: 0.00002
-
   # turn off augmentation, only use TrivialAugment
   random_erasing_p: 0
   mixup_alpha: 0
   cutmix_alpha: 0
   label_smoothing: 0
-
-trainer:
-  gpus: 2
-  strategy: ddp
-  precision: 16
-  benchmark: true
-  max_epochs: 100
-
-  logger:
-    - class_path: pytorch_lightning.loggers.WandbLogger
-      init_args:
-        project: imagenet
-        log_model: true
-
-  callbacks:
-    - class_path: pytorch_lightning.callbacks.LearningRateMonitor
-    - class_path: pytorch_lightning.callbacks.ModelCheckpoint
-      init_args:
-        monitor: val/acc
-        mode: max

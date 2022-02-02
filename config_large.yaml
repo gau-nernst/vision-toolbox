@@ -1,0 +1,2 @@
+model:
+  train_crop_size: 224

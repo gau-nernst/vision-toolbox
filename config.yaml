@@ -2,8 +2,8 @@ model:
   backbone: vovnet57
   num_classes: 1000
 
-  train_dir: datasets/ImageNet/ILSVRC/Data/CLS-LOC/train
-  val_dir: datasets/ImageNet/ILSVRC/Data/CLS-LOC/val
+  train_dir: ../datasets/ImageNet/ILSVRC/Data/CLS-LOC/train
+  val_dir: ../datasets/ImageNet/ILSVRC/Data/CLS-LOC/val
 
   batch_size: 512
   num_workers: 8
@@ -14,7 +14,7 @@ model:
 
 trainer:
   gpus: 2
-  strategy: ddp
+  strategy: ddp_find_unused_parameters_false
   precision: 16
   benchmark: true
   max_epochs: 100
