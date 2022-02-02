@@ -77,21 +77,29 @@ python train.py fit --config config.yaml
 
 ### Darknet
 
-Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org/abs/1804.02767)
+Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org/abs/1804.02767) [[CSPNet]](https://openaccess.thecvf.com/content_CVPRW_2020/papers/w28/Wang_CSPNet_A_New_Backbone_That_Can_Enhance_Learning_Capability_of_CVPRW_2020_paper.pdf)
 
 - Darknet-{19,53}
 - CSPDarknet-53
+- Darknet-YOLOv5{n,s,m,l,x}
 
-Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections). All LeakyReLU is replaced with ReLU.
+Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections). All LeakyReLU are replaced with ReLU.
+
+Darknet-YOLOv5 is adapted from Ultralytics' [YOLOv5](https://github.com/ultralytics/yolov5). It is the `backbone` section in the [config files](https://github.com/ultralytics/yolov5/blob/master/models/yolov5l.yaml) without the SPPF module. All SiLU are replaced with ReLU.
 
 Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)*
 --------------------------|-----------|------------|----------
-Darknet-19                | 73.5      | 19.82      | 5.50
-Darknet-19 (official^)    | 72.9      |            | 7.29
+Darknet-19                | 73.5      | 19.82      |  5.50
+Darknet-19 (official^)    | 72.9      |            |  7.29
 Darknet-53                | 77.3      | 40.64      | 14.33
 Darknet-53 (official^)    | 77.2      | 41.57      | 18.57
-CSPDarknet-53             | 77.1      | 26.28      | 9.42
+CSPDarknet-53             | 77.1      | 26.28      |  9.42
 CSPDarknet-53 (official^) | 77.2      | 27.61      | 13.07
+Darknet-YOLOv5n           |           |  0.88      |  0.33
+Darknet-YOLOv5s           |           |  3.51      |  1.23
+Darknet-YOLOv5m           |           | 10.69      |  3.70
+Darknet-YOLOv5l           |           | 23.96      |  8.31
+Darknet-YOLOv5x           |           | 45.18      | 15.73
 
 *FLOPS is measured with `(1,3,224,224)` input.
 
