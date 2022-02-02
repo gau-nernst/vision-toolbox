@@ -11,7 +11,7 @@ from ..components import ConvBnAct
 
 
 __all__ = [
-    "Darknet", "darknet19", "darknet53", "cspdarknet19", "cspdarknet53"
+    "Darknet", "darknet19", "darknet53", "cspdarknet53"
 ]
 
 
