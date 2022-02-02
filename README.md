@@ -119,14 +119,14 @@ Darknet-YOLOv5x           |           | 45.18      | 15.73     | default
 
 Paper: [[VoVNetV1]](https://arxiv.org/abs/1904.09730) [[VoVNetV2]](https://arxiv.org/abs/1911.06667)
 
-- VoVNet-{19-slim,39,57,99}
+- VoVNet-{19-slim,19,39,57,99}
 
 All models use V2 by default (with skip connection + effective Squeeze-Excitation). To create V1 models, pass `residual=False` and `ese=False` to model constructor.
 
 Implementation notes:
 
 - Original implementation ([here](https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py)) only applies eSE for stage 2 and 3 (each only has 1 block). timm ([here](https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vovnet.py)) applies eSE for the last block of each stage. This implementation applies eSE for all blocks. This has more impact for deeper models (e.g. VoVNet-99) as they have more blocks per stage. Profiling shows that applying eSE for all blocks incur at most extra ~10% forward time for VoVNet-99.
-- Both original implementation and timm merge max pool in stage 2 to the stem's last convolution (stage 1). This differs from VoVNetV1 paper. This implementation keeps max pool in stage 2. A few reasons for this: keep the code simple; stride 2 (stem) output is sufficiently good with 3 convs (although in practice rarely stride 2 output is used); stay faithful to the paper's specifications.
+- Both original implementation and timm merge max pool in stage 2 to the stem's last convolution (stage 1). This is not mentioned in the papers. This repo's implementation keeps max pool in stage 2. A few reasons for this: keep the code simple; stride 2 (stem) output is sufficiently good with 3 convs (although in practice rarely stride 2 output is used).
 - VoVNet with depth-wise separable convolution is not implemented.
 
 Backbone       | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
