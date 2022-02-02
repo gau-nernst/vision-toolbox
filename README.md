@@ -2,6 +2,8 @@
 
 Backbones, necks, and useful modules for Vision tasks.
 
+Special thanks to [MLDA@EEE Lab](https://www.ntu.edu.sg/eee/student-life/mlda) for providing GPU resources to train the models.
+
 ## Installation
 
 Install PyTorch and torchvision from conda. Then install this GitHub repo directly
@@ -43,6 +45,7 @@ python ./scripts/imagenet.py --val_solution_path ./ImageNet/LOC_val_solution.csv
 To create WebDataset shards
 
 ```bash
+pip install webdataset        # install webdataset
 python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/train --save_dir ./ImageNet/webdataset/train --shuffle True
 python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/val --save_dir ./ImageNet/webdataset/val --shuffle False
 ```
@@ -57,22 +60,29 @@ Reference training recipe:
 
 Training recipe
 
-- Optimizer: SGD, learning rate = 0.5, weight decay = 2e-5, 100 epochs
+- Optimizer: SGD
+- Epochs: 100
+- Learning rate: 0.5 for batch size 1024, linear scaling for other batch sizes
+- Weight decay: 2e-5
+- Batch size: 1024, unless stated otherwise (for larger models)
 - LR schedule: Linear warmup for 5 epochs, then cosine annealing
-- Batch size: 1024
-- Augmentations: Random Resized Crop, Trivial Augmentation, Randome Erasing (p=0.1), CutMix (alpha=1.0), and MixUp (alpha=0.2). For each batch, either CutMix or MixUp is applied, but not both.
-  - Random Erasing, CutMix, and Mixup are removed for small models (Darknet-19, VoVNet-19-slim, VoVNet-19)
+- Augmentations: (1) Random Resized Crop, (2) Trivial Augmentation, (3) Random Erasing (p=0.1), (4) CutMix (alpha=1.0), and (5) MixUp (alpha=0.2). For each batch, either CutMix or MixUp is applied, but not both.
 - Label smoothing = 0.1
-- FixRes: Train resized crop: 176, Val resize: 232, Val crop: 224
+- Val resize: 232, Val crop: 224
+- Train resized crop: 176 (FixRes)
 - Mixed-precision training
+- For small models, Random Erasing, CutMix, Mixup, and Label smoothing are removed (e.g. Darknet-19, VoVNet-19)
+- For large models, FixRes is removed -> train resized crop is 176 (e.g. VoVNet-99)
 
 Note: All hyperparameters are adopted from torchvision's recipe, except number of epochs (600 in torchvision's vs 100 in mine). Since the training time is shorter, augmentations should be reduced. Model EMA is not used.
 
-PyTorch Lightning is used to train the models (see `classifier.py`). The easiest way to run training is to use Lightning CLI with a config file (see below, `jsonargparse[signatures]` is required). Note that PyTorch Lightning is not required to create, run, and load the models.
+[PyTorch Lightning](https://github.com/PyTorchLightning/pytorch-lightning) is used to train the models (see `classifier.py`). The easiest way to run training is to use [Lightning CLI](https://pytorch-lightning.readthedocs.io/en/stable/common/lightning_cli.html) with a config file (see below, `jsonargparse[signatures]` is required). Note that PyTorch Lightning is not required to create, run, and load the models. Some config files are provided in this repo.
 
 ```bash
 pip install pytorch-lightning jsonargparse[signatures]    # dependencies for Lightning CLI
 python train.py fit --config config.yaml
+python train.py fit --config config.yaml --model.backbone cspdarknet53    # change backbone to train
+python train.py fit --config config.yaml --config config_wds.yaml         # use webdataset
 ```
 
 ### Darknet
@@ -87,19 +97,19 @@ Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements 
 
 Darknet-YOLOv5 is adapted from Ultralytics' [YOLOv5](https://github.com/ultralytics/yolov5). It is the `backbone` section in the [config files](https://github.com/ultralytics/yolov5/blob/master/models/yolov5l.yaml) without the SPPF module. All SiLU are replaced with ReLU.
 
-Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)*
---------------------------|-----------|------------|----------
-Darknet-19                | 73.5      | 19.82      |  5.50
-Darknet-19 (official^)    | 72.9      |            |  7.29
-Darknet-53                | 77.3      | 40.64      | 14.33
-Darknet-53 (official^)    | 77.2      | 41.57      | 18.57
-CSPDarknet-53             | 77.1      | 26.28      |  9.42
-CSPDarknet-53 (official^) | 77.2      | 27.61      | 13.07
-Darknet-YOLOv5n           |           |  0.88      |  0.33
-Darknet-YOLOv5s           |           |  3.51      |  1.23
-Darknet-YOLOv5m           |           | 10.69      |  3.70
-Darknet-YOLOv5l           |           | 23.96      |  8.31
-Darknet-YOLOv5x           |           | 45.18      | 15.73
+Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
+--------------------------|-----------|------------|-----------|--------------
+Darknet-19                | 73.5      | 19.82      |  5.50     | small
+Darknet-19 (official^)    | 72.9      |            |  7.29     | NA
+Darknet-53                | 77.3      | 40.64      | 14.33     | default
+Darknet-53 (official^)    | 77.2      | 41.57      | 18.57     | NA
+CSPDarknet-53             | 77.1      | 26.28      |  9.42     | default
+CSPDarknet-53 (official^) | 77.2      | 27.61      | 13.07     | NA
+Darknet-YOLOv5n           |           |  0.88      |  0.33     | small
+Darknet-YOLOv5s           |           |  3.51      |  1.23     | small
+Darknet-YOLOv5m           |           | 10.69      |  3.70     | small
+Darknet-YOLOv5l           |           | 23.96      |  8.31     | default
+Darknet-YOLOv5x           |           | 45.18      | 15.73     | default
 
 *FLOPS is measured with `(1,3,224,224)` input.
 
@@ -119,13 +129,13 @@ Implementation notes:
 - Both original implementation and timm merge max pool in stage 2 to the stem's last convolution (stage 1). This differs from VoVNetV1 paper. This implementation keeps max pool in stage 2. A few reasons for this: keep the code simple; stride 2 (stem) output is sufficiently good with 3 convs (although in practice rarely stride 2 output is used); stay faithful to the paper's specifications.
 - VoVNet with depth-wise separable convolution is not implemented.
 
-Backbone       | Top-1 acc | #Params(M) | FLOPS(G)*
----------------|-----------|------------|----------
-VoVNet-19-slim | 70.7      | 2.65       | 4.77
-VoVNet-19      | 75.4      | 10.18      | 9.66
-VoVNet-39      | 78.1      | 25.18      | 15.57
-VoVNet-57      | 79.2      | 41.45      | 19.30
-VoVNet-99      |           | 69.52      | 34.43
+Backbone       | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
+---------------|-----------|------------|-----------|--------------
+VoVNet-19-slim | 70.7      | 2.65       | 4.77      | small
+VoVNet-19      | 75.4      | 10.18      | 9.66      | small
+VoVNet-39      | 78.1      | 25.18      | 15.57     | default
+VoVNet-57      | 79.2      | 41.45      | 19.30     | default
+VoVNet-99      |           | 69.52      | 34.43     | large
 
 *FLOPS is measured with `(1,3,224,224)` input.
 
