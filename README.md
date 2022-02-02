@@ -80,7 +80,7 @@ python train.py fit --config config.yaml
 Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org/abs/1804.02767)
 
 - Darknet-{19,53}
-- CSPDarknet-{19,53}
+- CSPDarknet-53
 
 Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections). All LeakyReLU is replaced with ReLU.
 

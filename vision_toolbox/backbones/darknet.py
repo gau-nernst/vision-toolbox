@@ -107,12 +107,6 @@ configs = {
         "block_fn": DarknetStage,
         "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet53-2315d8ae.pth"
     },
-    "cspdarknet-19": {
-        "stem_channels": 32,
-        "num_blocks": (0, 1, 1, 2, 2),
-        "num_channels": (64, 128, 256, 512, 1024),
-        "block_fn": CSPDarknetStage
-    },
     "cspdarknet-53": {
         "stem_channels": 32,
         "num_blocks": (1, 2, 8, 8, 4),
@@ -124,5 +118,4 @@ configs = {
 
 def darknet19(pretrained=False, **kwargs): return Darknet.from_config(configs["darknet-19"], pretrained=pretrained, **kwargs)
 def darknet53(pretrained=False, **kwargs): return Darknet.from_config(configs["darknet-53"], pretrained=pretrained, **kwargs)
-def cspdarknet19(pretrained=False, **kwargs): return Darknet.from_config(configs["cspdarknet-19"], pretrained=pretrained, **kwargs)
 def cspdarknet53(pretrained=False, **kwargs): return Darknet.from_config(configs["cspdarknet-53"], pretrained=pretrained, **kwargs)
