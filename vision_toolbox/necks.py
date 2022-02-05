@@ -16,7 +16,7 @@ __all__ = [
 
 # support torchscript
 def aggregate_concat(x: List[torch.Tensor]) -> torch.Tensor:
-    return torch.concat(x, dim=1)       # torchscript does not support partial
+    return torch.cat(x, dim=1)       # torchscript does not support partial
 
 def aggregate_sum(x: List[torch.Tensor]) -> torch.Tensor:
     out = x[0]

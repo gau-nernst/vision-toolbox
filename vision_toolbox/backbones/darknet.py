@@ -95,7 +95,7 @@ class DarknetYolov5(BaseBackbone):
     def __init__(self, stem_channels, num_blocks, num_channels, block_fn=CSPDarknetStage, num_returns=4):
         assert num_returns <= 5
         super().__init__()
-        self.out_channel = tuple(num_channels)[-num_returns:]
+        self.out_channels = tuple(num_channels)[-num_returns:]
         self.stride = 32
         self.num_returns = num_returns
 

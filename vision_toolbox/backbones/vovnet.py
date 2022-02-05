@@ -1,6 +1,6 @@
 # Papers:
-# https://arxiv.org/abs/1904.09730
-# https://arxiv.org/abs/1911.06667
+# VoVNetV1: https://arxiv.org/abs/1904.09730
+# VoVNetV2: https://arxiv.org/abs/1911.06667 (CenterMask)
 
 import torch
 from torch import nn
@@ -9,53 +9,65 @@ from .base import BaseBackbone
 from ..components import ConvBnAct, ESEBlock
 
 
-__all__ = [
-    "VoVNet", "vovnet19_slim", "vovnet19", "vovnet39", "vovnet57", "vovnet99"
-]
+# __all__ = [
+#     "VoVNet", "vovnet19_slim", "vovnet19", "vovnet39", "vovnet57", "vovnet99"
+# ]
 
 # https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py
-_stage_channels = (128, 160, 192, 224)
-_out_channels = (256, 512, 768, 1024)
+_base = {
+    'stem_channels': (64, 64, 128),
+    'stage_channels': (128, 160, 192, 224),
+    'out_channels': (256, 512, 768, 1024),
+    'num_layers': (5, 5, 5, 5)
+}
+_slim = {
+    'stem_channels': (64, 64, 128),
+    'stage_channels': (64, 80, 96, 112),
+    'out_channels': (128, 256, 384, 512),
+    'num_layers': (3, 3, 3, 3)
+}
 configs = {
-    "vovnet-19-slim": {
-        "stem_channels": (64, 64, 128),
+    # VoVNetV1
+    'vovnet-27-slim': {
+        **_slim,
         "num_blocks": (1, 1, 1, 1),
-        "stage_channels": (64, 80, 96, 112),
-        "num_layers": (3, 3, 3, 3),
-        "out_channels": (112, 256, 384, 512),
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_slim-231d7449.pth"
+        'ese': False
     },
-    "vovnet-19": {
-        "stem_channels": (64, 64, 128),
-        "num_blocks": (1, 1, 1, 1),
-        "stage_channels": _stage_channels,
-        "num_layers": (3, 3, 3, 3),
-        "out_channels": _out_channels,
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19-4410fc5f.pth"
-    },
-    "vovnet-39": {
-        "stem_channels": (64, 64, 128),
+    'vovnet-39': {
+        **_base,
         "num_blocks": (1, 1, 2, 2),
-        "stage_channels": _stage_channels,
-        "num_layers": (5, 5, 5, 5),
-        "out_channels": _out_channels,
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39-b73bdbe9.pth"
+        "ese": False
     },
-    "vovnet-57": {
-        "stem_channels": (64, 64, 128),
+    'vovnet-57': {
+        **_base,
         "num_blocks": (1, 1, 4, 3),
-        "stage_channels": _stage_channels,
-        "num_layers": (5, 5, 5, 5),
-        "out_channels": _out_channels,
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57-630a88d1.pth"
+        "ese": False
     },
-    "vovnet-99": {
-        "stem_channels": (64, 64, 128),
-        "num_blocks": (1, 3, 9, 3),
-        "stage_channels": _stage_channels,
-        "num_layers": (5, 5, 5, 5),
-        "out_channels": _out_channels,
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet99-56fd52f5.pth"
+    # VoVNetV2
+    'vovnet-19-slim-ese': {
+        **_slim,
+        'num_blocks': (1, 1, 1, 1),
+    },
+    'vovnet-19-ese': {
+        **_base,
+        'num_blocks': (1, 1, 1, 1),
+        'num_layers': (3, 3, 3, 3),
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_ese-4410fc5f.pth'
+    },
+    'vovnet-39-ese': {
+        **_base,
+        'num_blocks': (1, 1, 2, 2),
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39_ese-b73bdbe9.pth'
+    },
+    'vovnet-57-ese': {
+        **_base,
+        'num_blocks': (1, 1, 4, 3),
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57_ese-630a88d1.pth'
+    },
+    'vovnet-99-ese': {
+        **_base,
+        'num_blocks': (1, 3, 9, 3),
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet99_ese-56fd52f5.pth'
     }
 }
 
@@ -78,7 +90,7 @@ class OSABlock(nn.Module):
             out = conv_layer(out)
             outputs.append(out)
 
-        out = torch.concat(outputs, dim=1)
+        out = torch.cat(outputs, dim=1)
         out = self.out_conv(out)
         
         if self.ese is not None:
@@ -128,8 +140,11 @@ class VoVNet(BaseBackbone):
         return outputs[-self.num_returns:]
 
 
-def vovnet19_slim(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-19-slim"], pretrained=pretrained, **kwargs)
-def vovnet19(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-19"], pretrained=pretrained, **kwargs)
+def vovnet27_slim(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-27-slim"], pretrained=pretrained, **kwargs)
 def vovnet39(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-39"], pretrained=pretrained, **kwargs)
 def vovnet57(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-57"], pretrained=pretrained, **kwargs)
-def vovnet99(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-99"], pretrained=pretrained, **kwargs)
+def vovnet19_slim_ese(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-19-slim-ese"], pretrained=pretrained, **kwargs)
+def vovnet19_ese(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-19-ese"], pretrained=pretrained, **kwargs)
+def vovnet39_ese(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-39-ese"], pretrained=pretrained, **kwargs)
+def vovnet57_ese(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-57-ese"], pretrained=pretrained, **kwargs)
+def vovnet99_ese(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-99-ese"], pretrained=pretrained, **kwargs)

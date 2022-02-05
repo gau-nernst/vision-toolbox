@@ -52,13 +52,13 @@ python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/val --save_dir
 
 There should be 147 shards of training set, and 7 shards of validation set. Each shard is 1GB.
 
-Reference training recipe:
+Reference recipes:
 
 - https://github.com/pytorch/vision/blob/main/references/classification/train.py
 - https://pytorch.org/blog/how-to-train-state-of-the-art-models-using-torchvision-latest-primitives/
 - Ross Wightman, ResNet strikesback: https://arxiv.org/abs/2110.00476
 
-Training recipe
+Recipe used in this repo:
 
 - Optimizer: SGD
 - Epochs: 100
@@ -72,13 +72,15 @@ Training recipe
 - Train resized crop: 176 (FixRes)
 - Mixed-precision training
 - For small models, Random Erasing, CutMix, Mixup, and Label smoothing are removed (e.g. Darknet-19, VoVNet-19)
-- For large models, FixRes is removed -> train resized crop is 176 (e.g. VoVNet-99)
+- For large models, FixRes is removed -> train resized crop is 224 (e.g. VoVNet-99)
 
 Note: All hyperparameters are adopted from torchvision's recipe, except number of epochs (600 in torchvision's vs 100 in mine). Since the training time is shorter, augmentations should be reduced. Model EMA is not used.
 
 [PyTorch Lightning](https://github.com/PyTorchLightning/pytorch-lightning) is used to train the models (see `classifier.py`). The easiest way to run training is to use [Lightning CLI](https://pytorch-lightning.readthedocs.io/en/stable/common/lightning_cli.html) with a config file (see below, `jsonargparse[signatures]` is required). Note that PyTorch Lightning is not required to create, run, and load the models. Some config files are provided in this repo.
 
 ```bash
+git clone https://github.com/gau-nernst/vision-toolbox.git
+cd vision-toolbox
 pip install pytorch-lightning jsonargparse[signatures]    # dependencies for Lightning CLI
 python train.py fit --config config.yaml
 python train.py fit --config config.yaml --model.backbone cspdarknet53    # change backbone to train
@@ -87,15 +89,15 @@ python train.py fit --config config.yaml --config config_wds.yaml         # use 
 
 ### Darknet
 
-Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org/abs/1804.02767) [[CSPNet]](https://openaccess.thecvf.com/content_CVPRW_2020/papers/w28/Wang_CSPNet_A_New_Backbone_That_Can_Enhance_Learning_Capability_of_CVPRW_2020_paper.pdf)
+Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org/abs/1804.02767) [[CSPNet]](https://openaccess.thecvf.com/content_CVPRW_2020/papers/w28/Wang_CSPNet_A_New_Backbone_That_Can_Enhance_Learning_Capability_of_CVPRW_2020_paper.pdf) [[YOLOv4]](https://arxiv.org/abs/2004.10934)
 
 - Darknet-{19,53}
 - CSPDarknet-53
 - Darknet-YOLOv5{n,s,m,l,x}
 
-Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections). All LeakyReLU are replaced with ReLU.
+Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections). CSPDarknet-53 originates from CSPNet and is used in YOLOv4, though it is not discussed in either paper. All LeakyReLU are replaced with ReLU.
 
-Darknet-YOLOv5 is adapted from Ultralytics' [YOLOv5](https://github.com/ultralytics/yolov5). It is the `backbone` section in the [config files](https://github.com/ultralytics/yolov5/blob/master/models/yolov5l.yaml) without the SPPF module. All SiLU are replaced with ReLU.
+Darknet-YOLOv5 is adapted from Ultralytics' [YOLOv5](https://github.com/ultralytics/yolov5). It is the `backbone` section in the [config files](https://github.com/ultralytics/yolov5/blob/master/models/yolov5l.yaml) without the SPPF module. All SiLU are replaced with ReLU. For batch norm layers, YOLOv5 set `eps=1e-3` and `momentum=0.03`, but this implementation keeps the default PyTorch values.
 
 Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
 --------------------------|-----------|------------|-----------|--------------
@@ -119,23 +121,28 @@ Darknet-YOLOv5x           |           | 45.18      | 15.73     | default
 
 Paper: [[VoVNetV1]](https://arxiv.org/abs/1904.09730) [[VoVNetV2]](https://arxiv.org/abs/1911.06667)
 
-- VoVNet-{19-slim,19,39,57,99}
+- VoVNet-(27-slim,39,57)
+- VoVNet-{19-slim,19,39,57,99}-ese
 
-All models use V2 by default (with skip connection + effective Squeeze-Excitation). To create V1 models, pass `residual=False` and `ese=False` to model constructor.
+All models have skip connections, which are not present in the original VoVNetV1. Non-ese (effective Squeeze-and-Excitation) models are from V1, while models with ese are from V2. The decision to keep V1 models is to have better compatibility for edge accelerators.
 
 Implementation notes:
 
 - Original implementation ([here](https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py)) only applies eSE for stage 2 and 3 (each only has 1 block). timm ([here](https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vovnet.py)) applies eSE for the last block of each stage. This implementation applies eSE for all blocks. This has more impact for deeper models (e.g. VoVNet-99) as they have more blocks per stage. Profiling shows that applying eSE for all blocks incur at most extra ~10% forward time for VoVNet-99.
+- VoVNet-19-slim output channels in stage 2 is changed to 128. Original implementation is 112.
 - Both original implementation and timm merge max pool in stage 2 to the stem's last convolution (stage 1). This is not mentioned in the papers. This repo's implementation keeps max pool in stage 2. A few reasons for this: keep the code simple; stride 2 (stem) output is sufficiently good with 3 convs (although in practice rarely stride 2 output is used).
 - VoVNet with depth-wise separable convolution is not implemented.
 
-Backbone       | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
----------------|-----------|------------|-----------|--------------
-VoVNet-19-slim | 70.7      |  2.65      |  4.80     | small
-VoVNet-19      | 75.4      | 10.18      |  9.70     | small
-VoVNet-39      | 78.1      | 25.18      | 15.62     | default
-VoVNet-57      | 79.2      | 41.45      | 19.35     | default
-VoVNet-99      | 80.7      | 69.52      | 34.51     | large, batch_size=512
+Backbone           | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
+-------------------|-----------|------------|-----------|--------------
+VoVNet-27-slim     |           |  2.19      |  4.85     | small
+VoVNet-39          |           | 21.58      | 15.61     | default
+VoVNet-57          |           | 35.62      | 19.33     | default
+VoVNet-19-slim-ese |           |  2.68      |  4.85     | small
+VoVNet-19-ese      | 75.4      | 10.18      |  9.70     | small
+VoVNet-39-ese      | 78.1      | 25.18      | 15.62     | default
+VoVNet-57-ese      | 79.2      | 41.45      | 19.35     | default
+VoVNet-99-ese      | 80.7      | 69.52      | 34.51     | large, batch_size=512
 
 *FLOPS is measured with `(1,3,224,224)` input.
 
@@ -144,7 +151,7 @@ VoVNet-99      | 80.7      | 69.52      | 34.51     | large, batch_size=512
 Some torchvision classification models are ported to use with the toolbox. They can output multiple feature map levels. `torchvision>=0.11.0` is required since its feature extraction API is used to do this.
 
 - For MobileNet and EfficientNet models, intermediate outputs are taken after the first 1x1 conv expansion layer of the strided MBConv block. See Section 6.2 of [MobileNetv2 paper](https://arxiv.org/abs/1801.04381) and Section 6.3 of [MobileNetv3 paper](https://arxiv.org/abs/1905.02244).
-- To use weights from the new PyTorch training recipe, go to torchvision's [prototype](https://github.com/pytorch/vision/tree/main/torchvision/prototype/models) directory and copy weights URLs (labelled as `ImageNet1K_V2`) from their respective models' files.
+- To use weights from the new PyTorch training recipe (which are significantly better), go to torchvision's [prototype](https://github.com/pytorch/vision/tree/main/torchvision/prototype/models) directory and copy weights URLs (labelled as `ImageNet1K_V2`) from their respective models' files.
 
 ResNet:
 
@@ -152,19 +159,21 @@ ResNet:
 - ResNeXt-{50,101}
 - Wide ResNet-{50_2,101_2}
 
+RegNet:
+
+- RegNetX-{400MF,800MF,1.6GF,3.2GF,8GF,16GF,32GF}
+- RegNetY-{400MF,800MF,1.6GF,3.2GF,8GF,16GF,32GF} (with SE)
+
 MobileNet:
 
 - MobileNetV2
 - MobileNetV3-{large,small}
 
-RegNet:
-
-- RegNetX-{400MF,800MF,1.6GF,3.2GF,8GF,16GF,32GF}
-- RegNetY-(400MF,800MF,1.6GF,3.2GF,8GF,16GF,32GF) (with SE)
-
 EfficientNet:
 
 - EfficientNet-{B0-B7}
+
+<details><summary>Profiling</summary>
 
 Backbone          | Top-1 acc^ | #Params(M) | FLOPS(G)*
 ------------------|------------|------------|----------
@@ -193,6 +202,8 @@ EfficientNet B7   | 84.1       |  63.79     | 10.53
 
 ^Top-1 accuracy is copied from [torchvision's documentation](https://pytorch.org/vision/stable/models.html) (0.11.0 at the time of writing)
 
+</details>
+
 ## Necks
 
 - [FPN](https://arxiv.org/abs/1612.03144)
@@ -202,7 +213,7 @@ EfficientNet B7   | 84.1       |  63.79     | 10.53
 
 Implementation notes
 
-- FPN: no batch norm and activation are used in lateral connections. Output convolutions (with batch norm and ReLU) are inside the top-down path..
+- FPN: no batch norm and activation are used in lateral connections. Output convolutions (with batch norm and ReLU) are inside the top-down path.
 
   ```python
   P5 = lateral_conv5(C5)

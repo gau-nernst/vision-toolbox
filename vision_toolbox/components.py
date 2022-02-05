@@ -91,4 +91,4 @@ class SPPBlock(nn.Module):
         for _ in range(self.repeats):
             out = self.pool(out)
             outputs.append(out)
-        return torch.concat(outputs, dim=1)
+        return torch.cat(outputs, dim=1)
