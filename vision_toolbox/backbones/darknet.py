@@ -133,7 +133,7 @@ configs = {
         "block_fn": DarknetStage,
         "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet53-2315d8ae.pth"
     },
-    # from YOLOv4
+    # from CSPNet/YOLOv4
     "cspdarknet-53": {
         "stem_channels": 32,
         "num_blocks": (1, 2, 8, 8, 4),

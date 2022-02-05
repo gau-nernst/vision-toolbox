@@ -1,11 +1,12 @@
+import os
+import io
 import math
 import time
+import hashlib
 
 import torch
 from torch import nn
 import torchvision.transforms.functional as TF
-
-import vision_toolbox.backbones.torchvision as torchvision_backbones
 
 
 # https://github.com/pytorch/vision/blob/main/references/classification/transforms.py
@@ -107,16 +108,19 @@ class RandomCutMixMixUp(nn.Module):
         return self.cutmix(batch, target)
 
 
-def extract_backbone_weights(lightning_ckpt_path, save_path):
+def extract_backbone_weights(lightning_ckpt_path, save_dir, save_name):
     ckpt = torch.load(lightning_ckpt_path, map_location='cpu')
     state_dict = ckpt["state_dict"]
     backbone_weights = {k[len("backbone."):]: v for k, v in state_dict.items() if k.startswith("backbone.")}
-    torch.save(backbone_weights, save_path)
+    
+    buffer = io.BytesIO()
+    torch.save(backbone_weights, buffer)
+    bin_data = buffer.getvalue()
+    hash = hashlib.sha256(bin_data).hexdigest()[:8]
 
-
-def extract_torchvision_backbone_weights(name, save_path):
-    m = torchvision_backbones.__dict__[name](pretrained=True)
-    torch.save(m.state_dict(), save_path)
+    name = os.path.join(save_dir, f'{save_name}-{hash}.pth')
+    with open(name, 'wb') as f:
+        f.write(bin_data)
 
 
 # Modified from YOLOv5 utils/torch_utils.py
@@ -131,18 +135,19 @@ def profile(module: nn.Module, input: torch.Tensor=None, n: int=10, device="cpu"
 
     flops = FlopCountAnalysis(module, input).total() / 1e9 * 2      # GFLOPs
 
-    def time_sync():
-        torch.cuda.synchronize()
+    def time_sync(device):
+        if device != 'cpu':
+            torch.cuda.synchronize(device=device)
         return time.time()
 
     tf, tb, t = 0, 0, [0, 0, 0]     # dt forward, backward
     for _ in range(n):
-        t[0] = time_sync()
+        t[0] = time_sync(device)
         out = module(input)
-        t[1] = time_sync()
+        t[1] = time_sync(device)
 
         out.sum().backward()
-        t[2] = time_sync()
+        t[2] = time_sync(device)
 
         tf += t[1] - t[0]
         tb += t[2] - t[1]

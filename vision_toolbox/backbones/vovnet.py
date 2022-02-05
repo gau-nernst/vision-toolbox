@@ -54,7 +54,8 @@ configs = {
         "num_blocks": (1, 3, 9, 3),
         "stage_channels": _stage_channels,
         "num_layers": (5, 5, 5, 5),
-        "out_channels": _out_channels
+        "out_channels": _out_channels,
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet99-56fd52f5.pth"
     }
 }
 
