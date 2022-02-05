@@ -1,12 +1,16 @@
+from packaging import version
 from typing import List
 import warnings
 
 import torch
-from torchvision.models import resnet, regnet, mobilenet, efficientnet
-try:
+import torchvision
+from torchvision.models import resnet, mobilenet
+if version.parse(torchvision.__version__) >= version.parse('0.11.0'):
+    from torchvision.models import regnet, efficientnet
     from torchvision.models.feature_extraction import create_feature_extractor
-except ImportError:
-    warnings.warn('Cannot import feature_extraction module. Torchvision models won\'t be available. Update to torchvision>=0.11.0 to use torchvision models.')
+else:
+    warnings.warn('torchvision < 0.11.0. torchvision models won\'t be available')
+    regnet = None
     create_feature_extractor = None
 
 from .base import BaseBackbone
@@ -15,11 +19,11 @@ from .base import BaseBackbone
 __all__ = [
     "ResNetExtractor", "RegNetExtractor", "MobileNetExtractor", "EfficientNetExtractor",
     "resnet18", "resnet34", "resnet50", "resnet101", "resnet152",
-    "resnext50_32x4d", "resnext101_32x8d", "wide_resnet50_2", "wide_resnet101_2",    
-    "regnet_y_400mf", "regnet_y_800mf", "regnet_y_1_6gf", "regnet_y_3_2gf",
-    "regnet_y_8gf", "regnet_y_16gf", "regnet_y_32gf", "regnet_y_128gf",
+    "resnext50_32x4d", "resnext101_32x8d", "wide_resnet50_2", "wide_resnet101_2",
     "regnet_x_400mf", "regnet_x_800mf", "regnet_x_1_6gf", "regnet_x_3_2gf",
-    "regnet_x_8gf", "regnet_x_16gf", "regnet_x_32gf",
+    "regnet_x_8gf", "regnet_x_16gf", "regnet_x_32gf",    
+    "regnet_y_400mf", "regnet_y_800mf", "regnet_y_1_6gf", "regnet_y_3_2gf",
+    "regnet_y_8gf", "regnet_y_16gf", "regnet_y_32gf",
     "mobilenet_v2", "mobilenet_v3_large", "mobilenet_v3_small",
     "efficientnet_b0", "efficientnet_b1", "efficientnet_b2", "efficientnet_b3",
     "efficientnet_b4", "efficientnet_b5", "efficientnet_b6", "efficientnet_b7"
@@ -99,14 +103,6 @@ def efficientnet_b5(pretrained=False, **kwargs): return EfficientNetExtractor("e
 def efficientnet_b6(pretrained=False, **kwargs): return EfficientNetExtractor("efficientnet_b6", pretrained=pretrained, **kwargs)
 def efficientnet_b7(pretrained=False, **kwargs): return EfficientNetExtractor("efficientnet_b7", pretrained=pretrained, **kwargs)
 
-def regnet_y_400mf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_400mf', pretrained=pretrained, **kwargs)
-def regnet_y_800mf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_800mf', pretrained=pretrained, **kwargs)
-def regnet_y_1_6gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_1_6gf', pretrained=pretrained, **kwargs)
-def regnet_y_3_2gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_3_2gf', pretrained=pretrained, **kwargs)
-def regnet_y_8gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_8gf', pretrained=pretrained, **kwargs)
-def regnet_y_16gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_16gf', pretrained=pretrained, **kwargs)
-def regnet_y_32gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_32gf', pretrained=pretrained, **kwargs)
-def regnet_y_128gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_128gf', pretrained=pretrained, **kwargs)
 def regnet_x_400mf(pretrained=False, **kwargs): return RegNetExtractor('regnet_x_400mf', pretrained=pretrained, **kwargs)
 def regnet_x_800mf(pretrained=False, **kwargs): return RegNetExtractor('regnet_x_800mf', pretrained=pretrained, **kwargs)
 def regnet_x_1_6gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_x_1_6gf', pretrained=pretrained, **kwargs)
@@ -114,3 +110,10 @@ def regnet_x_3_2gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_x
 def regnet_x_8gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_x_8gf', pretrained=pretrained, **kwargs)
 def regnet_x_16gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_x_16gf', pretrained=pretrained, **kwargs)
 def regnet_x_32gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_x_32gf', pretrained=pretrained, **kwargs)
+def regnet_y_400mf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_400mf', pretrained=pretrained, **kwargs)
+def regnet_y_800mf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_800mf', pretrained=pretrained, **kwargs)
+def regnet_y_1_6gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_1_6gf', pretrained=pretrained, **kwargs)
+def regnet_y_3_2gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_3_2gf', pretrained=pretrained, **kwargs)
+def regnet_y_8gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_8gf', pretrained=pretrained, **kwargs)
+def regnet_y_16gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_16gf', pretrained=pretrained, **kwargs)
+def regnet_y_32gf(pretrained=False, **kwargs): return RegNetExtractor('regnet_y_32gf', pretrained=pretrained, **kwargs)
