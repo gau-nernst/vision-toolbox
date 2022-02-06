@@ -9,9 +9,10 @@ from .base import BaseBackbone
 from ..components import ConvBnAct, ESEBlock
 
 
-# __all__ = [
-#     "VoVNet", "vovnet19_slim", "vovnet19", "vovnet39", "vovnet57", "vovnet99"
-# ]
+__all__ = [
+    "VoVNet", 'vovnet27_slim', 'vovnet39', 'vovnet57',
+    "vovnet19_slim_ese", "vovnet19_ese", "vovnet39_ese", "vovnet57_ese", "vovnet99_ese"
+]
 
 # https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py
 _base = {
@@ -101,15 +102,6 @@ class OSABlock(nn.Module):
         return out
 
 
-class OSAStage(nn.Sequential):
-    def __init__(self, num_blocks, in_channels, stage_channels, num_layers, out_channels, residual=True, ese=True):
-        super().__init__()
-        self.max_pool = nn.MaxPool2d(3, 2, padding=1)
-        for i in range(num_blocks):
-            in_c = in_channels if i == 0 else out_channels
-            self.add_module(f"module_{i}", OSABlock(in_c, stage_channels, num_layers, out_channels, residual=residual, ese=ese))
-
-
 class VoVNet(BaseBackbone):
     # to make VoVNetV1, pass residual=False and ese=False
     def __init__(self, stem_channels, num_blocks, stage_channels, num_layers, out_channels, residual=True, ese=True, num_returns=4):
@@ -126,8 +118,12 @@ class VoVNet(BaseBackbone):
         
         self.stages = nn.ModuleList()
         for n, stage_c, n_l, out_c in zip(num_blocks, stage_channels, num_layers, out_channels):
-            self.stages.append(OSAStage(n, in_c, stage_c, n_l, out_c, residual=residual, ese=ese))
-            in_c = out_c
+            stage = nn.Sequential()
+            stage.add_module('max_pool', nn.MaxPool2d(3, 2, padding=1))
+            for i in range(n):
+                stage.add_module(f'module_{i}', OSABlock(in_c, stage_c, n_l, out_c, residual=residual, ese=ese))
+                in_c = out_c
+            self.stages.append(stage)
 
     def forward_features(self, x):
         outputs = []
