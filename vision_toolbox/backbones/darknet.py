@@ -29,16 +29,11 @@ class DarknetBlock(nn.Module):
         return x + out
 
 
-class DarknetStage(nn.Module):
+class DarknetStage(nn.Sequential):
     def __init__(self, n, in_channels, out_channels):
         super().__init__()
         self.conv = ConvBnAct(in_channels, out_channels, stride=2)
         self.blocks = nn.Sequential(*[DarknetBlock(out_channels) for _ in range(n)])
-    
-    def forward(self, x):
-        out = self.conv(x)
-        out = self.blocks(out)
-        return out
 
 
 class CSPDarknetStage(nn.Module):
@@ -67,7 +62,7 @@ class CSPDarknetStage(nn.Module):
 
 
 class Darknet(BaseBackbone):
-    def __init__(self, stem_channels, num_blocks, num_channels, block_fn=DarknetStage, num_returns=4):
+    def __init__(self, stem_channels, num_blocks, num_channels, stage_fn=DarknetStage, num_returns=4):
         assert num_returns <= 5
         super().__init__() 
         self.out_channels = tuple(num_channels)[-num_returns:]
@@ -78,7 +73,7 @@ class Darknet(BaseBackbone):
         self.stages = nn.ModuleList()
         in_c = stem_channels
         for n, c in zip(num_blocks, num_channels):
-            self.stages.append(block_fn(n, in_c, c) if n > 0 else ConvBnAct(in_c, c, stride=2))
+            self.stages.append(stage_fn(n, in_c, c) if n > 0 else ConvBnAct(in_c, c, stride=2))
             in_c = c
         
     def forward_features(self, x):
@@ -92,7 +87,7 @@ class Darknet(BaseBackbone):
 
 
 class DarknetYolov5(BaseBackbone):
-    def __init__(self, stem_channels, num_blocks, num_channels, block_fn=CSPDarknetStage, num_returns=4):
+    def __init__(self, stem_channels, num_blocks, num_channels, stage_fn=CSPDarknetStage, num_returns=4):
         assert num_returns <= 5
         super().__init__()
         self.out_channels = tuple(num_channels)[-num_returns:]
@@ -103,7 +98,7 @@ class DarknetYolov5(BaseBackbone):
         self.stages = nn.ModuleList()
         in_c = stem_channels
         for n, c in zip(num_blocks, num_channels):
-            self.stages.append(block_fn(n, in_c, c))
+            self.stages.append(stage_fn(n, in_c, c))
             in_c = c
 
     def forward_features(self, x):
@@ -113,33 +108,30 @@ class DarknetYolov5(BaseBackbone):
         return outputs[-self.num_returns:]
 
 
+_base = {
+    'stem_channels': 32,
+    'num_channels': (64, 128, 256, 512, 1024)
+}
 _darknet_yolov5_stem_channels = 64
 _darknet_yolov5_num_blocks = (3, 6, 9, 3)
 _darknet_yolov5_num_channels = (128, 256, 512, 1024)
 configs = {
     # from YOLOv2
     "darknet-19": {
-        "stem_channels": 32,
+        **_base,
         "num_blocks": (0, 1, 1, 2, 2),
-        "num_channels": (64, 128, 256, 512, 1024),
-        "block_fn": DarknetStage,
         "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet19-da4bd7c9.pth"
     },
     # from YOLOv3
     "darknet-53": {
-        "stem_channels": 32,
+        **_base,
         "num_blocks": (1, 2, 8, 8, 4),
-        "num_channels": (64, 128, 258, 512, 1024),
-        "block_fn": DarknetStage,
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet53-2315d8ae.pth"
     },
     # from CSPNet/YOLOv4
     "cspdarknet-53": {
-        "stem_channels": 32,
+        **_base,
         "num_blocks": (1, 2, 8, 8, 4),
-        "num_channels": (64, 128, 258, 512, 1024),
-        "block_fn": CSPDarknetStage,
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/cspdarknet53-cfb1eaf2.pth"
+        "stage_fn": CSPDarknetStage
     },
     # from YOLOv5
     'darknet-yolov5n': {

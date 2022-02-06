@@ -102,11 +102,8 @@ Darknet-YOLOv5 is adapted from Ultralytics' [YOLOv5](https://github.com/ultralyt
 Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
 --------------------------|-----------|------------|-----------|--------------
 Darknet-19                | 73.5      | 19.82      |  5.53     | small
-Darknet-19 (official^)    | 72.9      |            |  7.29     | NA
-Darknet-53                | 77.3      | 40.64      | 14.38     | default
-Darknet-53 (official^)    | 77.2      | 41.57      | 18.57     | NA
-CSPDarknet-53             | 77.1      | 26.28      |  9.48     | default
-CSPDarknet-53 (official^) | 77.2      | 27.61      | 13.07     | NA
+Darknet-53                |           | 40.58      | 14.31     | default
+CSPDarknet-53             |           | 26.24      |  9.44     | default
 Darknet-YOLOv5n           |           |  0.88      |  0.33     | small
 Darknet-YOLOv5s           |           |  3.51      |  1.23     | small
 Darknet-YOLOv5m           |           | 10.69      |  3.70     | small
@@ -115,7 +112,13 @@ Darknet-YOLOv5x           |           | 45.18      | 15.73     | default
 
 *FLOPS is measured with `(1,3,224,224)` input.
 
-^Sources: [[pjreddie's website]](https://pjreddie.com/darknet/imagenet/) [[WongKinYiu's CSP GitHub repo]](https://github.com/WongKinYiu/CrossStagePartialNetworks). Official Darknet models use 256x256 image, thus their FLOPS are slightly higher. The 1000-class classification head is probaby included in their Parameters and FLOPS count, resulting in slightly higher numbers.
+For reference, official Darknet models (Sources: [[pjreddie's website]](https://pjreddie.com/darknet/imagenet/) [[WongKinYiu's CSP GitHub repo]](https://github.com/WongKinYiu/CrossStagePartialNetworks)):
+
+- Darknet-19: top-1 72.9%, 7.29G FLOPS
+- Darknet-53: top-1 77.2%, 41.57M params, 18.57 FLOPS
+- CSPDarknet-53: top-1 77.2%, 27.61M params, 13.07 FLOPS
+- These models use 256x256 image, thus their FLOPS are slightly higher
+- The 1000-class classification head is probaby included in their Parameters and FLOPS count, resulting in slightly higher numbers.
 
 ### VoVNet
 
