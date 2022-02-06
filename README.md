@@ -175,28 +175,29 @@ EfficientNet:
 
 <details><summary>Profiling</summary>
 
-Backbone          | Top-1 acc^ | #Params(M) | FLOPS(G)*
-------------------|------------|------------|----------
-ResNet-18         | 69.8       |  11.18     |  3.64
-ResNet-34         | 73.3       |  21.28     |  7.34
-ResNet-50         | 76.1       |  23.51     |  8.22
-ResNet-101        | 77.4       |  42.50     | 15.66
+Backbone          | Top-1 acc^ | #Params(M) | FLOPS(G)* | Backbone          | Top-1 acc^ | #Params(M) | FLOPS(G)*
+------------------|------------|------------|-----------|-------------------|------------|------------|----------
+**ResNet family**
+ResNet-18         | 69.8       |  11.18     |  3.64     | ResNeXt-50 32x4d  | 77.6       |  22.98     |  8.51
+ResNet-34         | 73.3       |  21.28     |  7.34     | ResNeXt-101 32x8d | 79.3       |  86.74     | 32.95
+ResNet-50         | 76.1       |  23.51     |  8.22     | Wide ResNet-50-2  | 78.5       |  66.83     | 22.85
+ResNet-101        | 77.4       |  42.50     | 15.66     | Wide ResNet-101-2 | 78.9       | 124.84     | 45.59
 ResNet-152        | 78.3       |  58.14     | 23.11
-ResNeXt-50 32x4d  | 77.6       |  22.98     |  8.51
-ResNeXt-101 32x8d | 79.3       |  86.74     | 32.95
-Wide ResNet-50-2  | 78.5       |  66.83     | 22.85
-Wide ResNet-101-2 | 78.9       | 124.84     | 45.59
+**RegNet family**
+RegNetX-400MF     | 72.8       |   5.10     |  0.84     | RegNetY-400MF     | 74.0       |   3.90     |  0.82
+RegNetX-800MF     | 75.2       |   6.59     |  1.62     | RegNetY-800MF     | 76.4       |   5.65     |  1.69
+RegNetX-1.6GF     | 77.0       |   8.28     |  3.24     | RegNetY-1.6GF     | 78.0       |  10.31     |  3.26
+RegNetX-3.2GF     | 78.4       |  14.29     |  6.40     | RegNetY-3.2GF     | 78.9       |  17.92     |  6.40
+RegNetX-8GF       | 79.3       |  37.65     | 16.04     | RegNetY-8GF       | 80.0       |  37.36     | 17.03
+RegNetX-16GF      | 80.1       |  52.23     | 31.98     | RegNetY-16GF      | 80.4       |  80.57     | 31.92
+RegNetX-32GF      | 80.6       | 105.29     | 63.61     | RegNetY-32GF      | 80.9       | 141.33     | 64.69
+**MobileNet family**
 MobileNetV2       | 71.9       |   2.22     |  0.63
-MobileNetV3 large | 74.0       |   2.97     |  0.45
-MobileNetV3 small | 67.7       |   0.93     |  0.12
-EfficientNet B0   | 77.7       |   4.01     |  0.80
-EfficientNet B1   | 78.6       |   6.51     |  1.18
-EfficientNet B2   | 80.6       |   7.70     |  1.36
-EfficientNet B3   | 82.0       |  10.70     |  1.98
-EfficientNet B4   | 83.4       |  17.55     |  3.09
-EfficientNet B5   | 83.4       |  28.34     |  4.82
-EfficientNet B6   | 84.0       |  40.74     |  6.86
-EfficientNet B7   | 84.1       |  63.79     | 10.53
+MobileNetV3 small | 67.7       |   0.93     |  0.12     | MobileNetV3 large | 74.0       |   2.97     |  0.45
+EfficientNet B0   | 77.7       |   4.01     |  0.80     | EfficientNet B4   | 83.4       |  17.55     |  3.09
+EfficientNet B1   | 78.6       |   6.51     |  1.18     | EfficientNet B5   | 83.4       |  28.34     |  4.82
+EfficientNet B2   | 80.6       |   7.70     |  1.36     | EfficientNet B6   | 84.0       |  40.74     |  6.86
+EfficientNet B3   | 82.0       |  10.70     |  1.98     | EfficientNet B7   | 84.1       |  63.79     | 10.53
 
 *FLOPS is measured with `(1,3,224,224)` input.
 
