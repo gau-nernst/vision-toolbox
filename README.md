@@ -95,9 +95,13 @@ Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org
 - CSPDarknet-53
 - Darknet-YOLOv5{n,s,m,l,x}
 
-Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections). CSPDarknet-53 originates from CSPNet and is used in YOLOv4, though it is not discussed in either paper. All LeakyReLU are replaced with ReLU.
+<details><summary>Implementation notes</summary>
 
-Darknet-YOLOv5 is adapted from Ultralytics' [YOLOv5](https://github.com/ultralytics/yolov5). It is the `backbone` section in the [config files](https://github.com/ultralytics/yolov5/blob/master/models/yolov5l.yaml) without the SPPF module. All SiLU are replaced with ReLU. For batch norm layers, YOLOv5 set `eps=1e-3` and `momentum=0.03`, but this implementation keeps the default PyTorch values.
+- Darknet-53 is from YOLOv3. Darknet-19 is modified from YOLOv2 with improvements from YOLOv3 (replace stride 2 max pooling + 3x3 conv with single stride 2 3x3 conv and add skip connections). CSPDarknet-53 originates from CSPNet and is used in YOLOv4, though it is not discussed in either paper. All LeakyReLU are replaced with ReLU.
+- In CSPDarknet-53's [original config](https://github.com/WongKinYiu/CrossStagePartialNetworks/blob/master/cfg/csdarknet53.cfg), stage 1 does not have reduced width even though it has cross-stage connection. This implementation maintains the width reduction in stage 1.
+- Darknet-YOLOv5 is adapted from Ultralytics' [YOLOv5](https://github.com/ultralytics/yolov5). It is the `backbone` section in the [config files](https://github.com/ultralytics/yolov5/blob/master/models/yolov5l.yaml) without the SPPF module. All SiLU are replaced with ReLU. For batch norm layers, YOLOv5 set `eps=1e-3` and `momentum=0.03`, but this implementation keeps the default PyTorch values.
+
+</details>
 
 Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
 --------------------------|-----------|------------|-----------|--------------
@@ -127,14 +131,15 @@ Paper: [[VoVNetV1]](https://arxiv.org/abs/1904.09730) [[VoVNetV2]](https://arxiv
 - VoVNet-(27-slim,39,57)
 - VoVNet-{19-slim,19,39,57,99}-ese
 
-All models have skip connections, which are not present in the original VoVNetV1. Non-ese (effective Squeeze-and-Excitation) models are from V1, while models with ese are from V2. The decision to keep V1 models is to have better compatibility for edge accelerators.
+<details><summary>Implementation notes</summary>
 
-Implementation notes:
-
+- All models have skip connections, which are not present in the original VoVNetV1. Non-ese (effective Squeeze-and-Excitation) models are from V1, while models with ese are from V2. The decision to keep V1 models is to have better compatibility for edge accelerators.
 - Original implementation ([here](https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py)) only applies eSE for stage 2 and 3 (each only has 1 block). timm ([here](https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vovnet.py)) applies eSE for the last block of each stage. This implementation applies eSE for all blocks. This has more impact for deeper models (e.g. VoVNet-99) as they have more blocks per stage. Profiling shows that applying eSE for all blocks incur at most extra ~10% forward time for VoVNet-99.
 - VoVNet-19-slim output channels in stage 2 is changed to 128. Original implementation is 112.
 - Both original implementation and timm merge max pool in stage 2 to the stem's last convolution (stage 1). This is not mentioned in the papers. This repo's implementation keeps max pool in stage 2. A few reasons for this: keep the code simple; stride 2 (stem) output is sufficiently good with 3 convs (although in practice rarely stride 2 output is used).
 - VoVNet with depth-wise separable convolution is not implemented.
+
+</details>
 
 Backbone           | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
 -------------------|-----------|------------|-----------|--------------
