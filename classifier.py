@@ -6,6 +6,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from torch.utils.data import DataLoader
+import torchvision
 from torchvision.datasets import ImageFolder
 import torchvision.transforms as T
 from torchvision.transforms.functional import InterpolationMode
@@ -25,6 +26,13 @@ _optimizers = {
     "AdamW": torch.optim.AdamW,
     "RMSprop": partial(torch.optim.RMSprop, momentum=0.9)
 }
+
+
+def image_loader(path, device='cpu'):
+    img = torchvision.io.read_file(path)
+    img = torchvision.io.decode_jpeg(img, device=device)
+    return img
+
 
 class ImageClassifier(pl.LightningModule):
     def __init__(
@@ -57,21 +65,19 @@ class ImageClassifier(pl.LightningModule):
         warmup_decay: float=0.01,
 
         # others
-        jit: bool=True,
-        backbone_weights: str=None,
+        jit: bool=False,
+        channels_last: bool=False,
         webdataset: bool=False,
         train_size: int=0,
         val_size: int=0
         ):
         super().__init__()
-        self.backbone = backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
-        if backbone_weights is not None:
-            self.backbone.load_state_dict(torch.load(backbone_weights))
-        
-        self.classifier = nn.Sequential(
+        backbone = backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
+        self.model = nn.Sequential(
+            backbone,
             nn.AdaptiveAvgPool2d((1,1)),
             nn.Flatten(),
-            nn.Linear(self.backbone.get_out_channels()[-1], num_classes)
+            nn.Linear(backbone.get_out_channels()[-1], num_classes)
         )
 
         train_transforms = [
@@ -86,12 +92,11 @@ class ImageClassifier(pl.LightningModule):
         self.train_transforms = nn.Sequential(*train_transforms)
         self.mixup_cutmix = RandomCutMixMixUp(num_classes, cutmix_alpha, mixup_alpha) if cutmix_alpha > 0 and mixup_alpha > 0 else None
 
+        if channels_last:
+            self.model = self.model.to(memory_format=torch.channels_last)
+
         if jit:
-            self.backbone = torch.jit.script(self.backbone)
-            self.classifier = torch.jit.script(self.classifier)
-            self.train_transforms = torch.jit.script(self.train_transforms)
-            if self.mixup_cutmix is not None:
-                self.mixup_cutmix = torch.jit.script(self.mixup_cutmix)
+            self.model = torch.jit.script(self.model)
 
         self.save_hyperparameters()
 
@@ -133,19 +138,16 @@ class ImageClassifier(pl.LightningModule):
         ])
         return self.get_dataloader(transform, training=False)
 
-    def forward(self, x):
-        out = self.backbone(x)
-        out = self.classifier(out)
-        return out
-
     def training_step(self, batch, batch_idx):
         images, labels = batch
         images = self.train_transforms(images)
         
         if self.mixup_cutmix is not None:
             images, labels = self.mixup_cutmix(images, labels)
+        if self.hparams.channels_last:
+            images = images.to(memory_format=torch.channels_last)
 
-        logits = self(images)
+        logits = self.model(images)
         loss = F.cross_entropy(logits, labels, label_smoothing=self.hparams.label_smoothing)
         self.log("train/loss", loss, sync_dist=True)
         
@@ -153,8 +155,10 @@ class ImageClassifier(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         images, labels = batch
+        if self.hparams.channels_last:
+            images = images.to(memory_format=torch.channels_last)
 
-        logits = self(images)
+        logits = self.model(images)
         loss = F.cross_entropy(logits, labels)
         self.log("val/loss", loss, sync_dist=True)
 
