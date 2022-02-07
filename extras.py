@@ -18,7 +18,7 @@ class RandomMixup(nn.Module):
         self.alpha = alpha
         self.inplace = inplace
 
-    def forward(self, batch, target):
+    def forward(self, batch: torch.Tensor, target: torch.Tensor):
         if not self.inplace:
             batch = batch.clone()
             target = target.clone()
@@ -52,7 +52,7 @@ class RandomCutmix(nn.Module):
         self.alpha = alpha
         self.inplace = inplace
 
-    def forward(self, batch, target):
+    def forward(self, batch: torch.Tensor, target: torch.Tensor):
         if not self.inplace:
             batch = batch.clone()
             target = target.clone()

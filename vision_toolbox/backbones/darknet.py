@@ -137,12 +137,14 @@ configs = {
     'darknet-yolov5n': {
         'stem_channels': int(_darknet_yolov5_stem_channels/4),
         'num_blocks': tuple(int(x/3) for x in _darknet_yolov5_num_blocks),
-        'num_channels': tuple(int(x/4) for x in _darknet_yolov5_num_channels)
+        'num_channels': tuple(int(x/4) for x in _darknet_yolov5_num_channels),
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5n-a9335553.pth'
     },
     'darknet-yolov5s': {
         'stem_channels': int(_darknet_yolov5_stem_channels/2),
         'num_blocks': tuple(int(x/3) for x in _darknet_yolov5_num_blocks),
-        'num_channels': tuple(int(x/2) for x in _darknet_yolov5_num_channels)
+        'num_channels': tuple(int(x/2) for x in _darknet_yolov5_num_channels),
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5s-e8dba89f.pth'
     },
     'darknet-yolov5m': {
         'stem_channels': int(_darknet_yolov5_stem_channels*3/4),

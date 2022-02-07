@@ -108,8 +108,8 @@ Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
 Darknet-19                | 73.5      | 19.82      |  5.53     | small
 Darknet-53                |           | 40.58      | 14.31     | default
 CSPDarknet-53             |           | 26.24      |  9.44     | default
-Darknet-YOLOv5n           |           |  0.88      |  0.33     | small
-Darknet-YOLOv5s           |           |  3.51      |  1.23     | small
+Darknet-YOLOv5n           | 56.3      |  0.88      |  0.33     | small
+Darknet-YOLOv5s           | 67.3      |  3.51      |  1.23     | small
 Darknet-YOLOv5m           |           | 10.69      |  3.70     | small
 Darknet-YOLOv5l           |           | 23.96      |  8.31     | default
 Darknet-YOLOv5x           |           | 45.18      | 15.73     | default

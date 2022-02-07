@@ -103,7 +103,6 @@ class OSABlock(nn.Module):
 
 
 class VoVNet(BaseBackbone):
-    # to make VoVNetV1, pass residual=False and ese=False
     def __init__(self, stem_channels, num_blocks, stage_channels, num_layers, out_channels, residual=True, ese=True, num_returns=4):
         super().__init__()
         self.out_channels = tuple(out_channels)[-num_returns:]
