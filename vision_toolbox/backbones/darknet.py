@@ -117,21 +117,23 @@ _darknet_yolov5_num_blocks = (3, 6, 9, 3)
 _darknet_yolov5_num_channels = (128, 256, 512, 1024)
 configs = {
     # from YOLOv2
-    "darknet-19": {
+    'darknet-19': {
         **_base,
-        "num_blocks": (0, 1, 1, 2, 2),
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet19-da4bd7c9.pth"
+        'num_blocks': (0, 1, 1, 2, 2),
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet19-da4bd7c9.pth'
     },
     # from YOLOv3
-    "darknet-53": {
+    'darknet-53': {
         **_base,
-        "num_blocks": (1, 2, 8, 8, 4),
+        'num_blocks': (1, 2, 8, 8, 4),
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet53-7433abc1.pth'
     },
     # from CSPNet/YOLOv4
-    "cspdarknet-53": {
+    'cspdarknet-53': {
         **_base,
-        "num_blocks": (1, 2, 8, 8, 4),
-        "stage_fn": CSPDarknetStage
+        'num_blocks': (1, 2, 8, 8, 4),
+        'stage_fn': CSPDarknetStage,
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/cspdarknet53-f8225d3d.pth'
     },
     # from YOLOv5
     'darknet-yolov5n': {

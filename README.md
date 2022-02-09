@@ -106,8 +106,8 @@ Paper: [[YOLOv2]](https://arxiv.org/abs/1612.08242) [[YOLOv3]](https://arxiv.org
 Backbone                  | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
 --------------------------|-----------|------------|-----------|--------------
 Darknet-19                | 73.5      | 19.82      |  5.53     | small
-Darknet-53                |           | 40.58      | 14.31     | default
-CSPDarknet-53             |           | 26.24      |  9.44     | default
+Darknet-53                | 76.9      | 40.58      | 14.31     | default
+CSPDarknet-53             | 77.5      | 26.24      |  9.44     | default
 Darknet-YOLOv5n           | 56.3      |  0.88      |  0.33     | small
 Darknet-YOLOv5s           | 67.3      |  3.51      |  1.23     | small
 Darknet-YOLOv5m           |           | 10.69      |  3.70     | small
