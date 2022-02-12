@@ -110,8 +110,8 @@ Darknet-53                | 76.9      | 40.58      | 14.31     | default
 CSPDarknet-53             | 77.5      | 26.24      |  9.44     | default
 Darknet-YOLOv5n           | 56.3      |  0.88      |  0.33     | small
 Darknet-YOLOv5s           | 67.3      |  3.51      |  1.23     | small
-Darknet-YOLOv5m           |           | 10.69      |  3.70     | small
-Darknet-YOLOv5l           |           | 23.96      |  8.31     | default
+Darknet-YOLOv5m           | 73.8      | 10.69      |  3.70     | small
+Darknet-YOLOv5l           | 76.9      | 23.96      |  8.31     | default
 Darknet-YOLOv5x           |           | 45.18      | 15.73     | default
 
 *FLOPS is measured with `(1,3,224,224)` input.

@@ -72,6 +72,7 @@ class ImageClassifier(pl.LightningModule):
         val_size: int=0
         ):
         super().__init__()
+        self.save_hyperparameters()
         backbone = backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
         self.model = nn.Sequential(
             backbone,
@@ -94,11 +95,8 @@ class ImageClassifier(pl.LightningModule):
 
         if channels_last:
             self.model = self.model.to(memory_format=torch.channels_last)
-
         if jit:
             self.model = torch.jit.script(self.model)
-
-        self.save_hyperparameters()
 
     def get_dataloader(self, transform, training=False, pin_memory=True):
         data_dir = self.hparams.train_dir if training else self.hparams.val_dir
