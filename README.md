@@ -13,6 +13,12 @@ conda install pytorch torchvision cudatoolkit=11.3 -c pytorch
 pip install git+https://github.com/gau-nernst/vision-toolbox.git
 ```
 
+To update
+
+```bash
+pip install -U --force-reinstall --no-deps git+https://github.com/gau-nernst/vision-toolbox.git
+```
+
 ## Usage
 
 ```python
@@ -20,7 +26,7 @@ from vision_toolbox import backbones
 
 model = backbones.cspdarknet53(pretrained=True)
 model(inputs)                       # last feature map, stride 32
-model.forward_features(inputs)      # list of 5 feature maps, stride 2, 4, 8, 16, 32
+model.forward_features(inputs)      # list of 4 feature maps, stride 4, 8, 16, 32
 model.get_out_channels()            # channels of output feature maps
 ```
 
@@ -112,7 +118,7 @@ Darknet-YOLOv5n           | 56.3      |  0.88      |  0.33     | small
 Darknet-YOLOv5s           | 67.3      |  3.51      |  1.23     | small
 Darknet-YOLOv5m           | 73.8      | 10.69      |  3.70     | small
 Darknet-YOLOv5l           | 76.9      | 23.96      |  8.31     | default
-Darknet-YOLOv5x           |           | 45.18      | 15.73     | default
+Darknet-YOLOv5x           | 78.6      | 45.18      | 15.73     | large, batch_size = 512
 
 *FLOPS is measured with `(1,3,224,224)` input.
 

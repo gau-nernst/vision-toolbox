@@ -163,7 +163,8 @@ configs = {
     'darknet-yolov5x': {
         'stem_channels': int(_darknet_yolov5_stem_channels*5/4),
         'num_blocks': tuple(int(x*4/3) for x in _darknet_yolov5_num_blocks),
-        'num_channels': tuple(int(x*5/4) for x in _darknet_yolov5_num_channels)
+        'num_channels': tuple(int(x*5/4) for x in _darknet_yolov5_num_channels),
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5x-bf388a43.pth'
     }
 }
 
