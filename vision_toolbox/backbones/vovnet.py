@@ -32,7 +32,8 @@ configs = {
     'vovnet-27-slim': {
         **_slim,
         "num_blocks": (1, 1, 1, 1),
-        'ese': False
+        'ese': False,
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet27_slim-7ac333a5.pth'
     },
     'vovnet-39': {
         **_base,
@@ -48,6 +49,7 @@ configs = {
     'vovnet-19-slim-ese': {
         **_slim,
         'num_blocks': (1, 1, 1, 1),
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_slim_ese-446e2ae9.pth'
     },
     'vovnet-19-ese': {
         **_base,
