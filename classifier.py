@@ -85,7 +85,7 @@ class ImageClassifier(pl.LightningModule):
             T.RandomHorizontalFlip(),
             T.autoaugment.TrivialAugmentWide(interpolation=InterpolationMode.BILINEAR),
             T.ConvertImageDtype(torch.float),
-            T.Normalize(mean=(0.5,0.5,0.5), std=(0.5,0.5,0.5)),
+            T.Normalize(mean=(0,0,0), std=(1,1,1)),
         ]
         if random_erasing_p > 0:
             train_transforms.append(T.RandomErasing(p=random_erasing_p, value="random"))
@@ -132,7 +132,7 @@ class ImageClassifier(pl.LightningModule):
             T.CenterCrop(self.hparams.val_crop_size),
             T.PILToTensor(),
             T.ConvertImageDtype(torch.float),
-            T.Normalize(mean=(0.5,0.5,0.5), std=(0.5,0.5,0.5))
+            T.Normalize(mean=(0,0,0), std=(1,1,1))
         ])
         return self.get_dataloader(transform, training=False)
 
