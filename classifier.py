@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Union
+from typing import Callable, Union
 
 import torch
 from torch import nn
@@ -7,14 +7,11 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from torch.utils.data import DataLoader
 import torchvision
-from torchvision.datasets import ImageFolder
 import torchvision.transforms as T
-from torchvision.transforms.functional import InterpolationMode
 import pytorch_lightning as pl
 import webdataset as wds
 
 from vision_toolbox import backbones
-from vision_toolbox.backbones.base import BaseBackbone
 from extras import RandomCutMixMixUp
 
 # https://github.com/pytorch/vision/blob/main/references/classification/train.py
@@ -34,16 +31,23 @@ def image_loader(path, device='cpu'):
     return img
 
 
+class AveragePool(nn.Sequential):
+    def __init__(self):
+        self.pool = nn.AdaptiveAvgPool2d((1,1))
+        self.flatten = nn.Flatten()
+
+
 class ImageClassifier(pl.LightningModule):
     def __init__(
         self,
         # model
-        backbone: Union[str, BaseBackbone],
+        backbone: Union[str, backbones.BaseBackbone],
         num_classes: int,
+        pool_fn: Callable[..., nn.Module]=AveragePool,
         
         # data
-        train_dir: str,
-        val_dir: str,
+        train_dir: str=None,
+        val_dir: str=None,
         batch_size: int=128,
         num_workers: int=4,
         train_crop_size: int=176,
@@ -74,16 +78,15 @@ class ImageClassifier(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         backbone = backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
-        self.model = nn.Sequential(
-            backbone,
-            nn.AdaptiveAvgPool2d((1,1)),
-            nn.Flatten(),
-            nn.Linear(backbone.get_out_channels()[-1], num_classes)
-        )
+        layers = [backbone]
+        if pool_fn is not None:
+            layers.append(pool_fn())
+        layers.append(nn.Linear(backbone.get_out_channels()[-1], num_classes))
+        self.model = nn.Sequential(*layers)
 
         train_transforms = [
             T.RandomHorizontalFlip(),
-            T.autoaugment.TrivialAugmentWide(interpolation=InterpolationMode.BILINEAR),
+            T.autoaugment.TrivialAugmentWide(interpolation=T.InterpolationMode.BILINEAR),
             T.ConvertImageDtype(torch.float),
             T.Normalize(mean=(0,0,0), std=(1,1,1)),
         ]
@@ -115,7 +118,7 @@ class ImageClassifier(pl.LightningModule):
             if training:
                 dataloader = dataloader.ddp_equalize(self.hparams.train_size//self.hparams.batch_size)
         else:
-            ds = ImageFolder(data_dir, transform=transform)
+            ds = torchvision.datasets.ImageFolder(data_dir, transform=transform)
             dataloader = DataLoader(ds, batch_size=self.hparams.batch_size, shuffle=training, num_workers=self.hparams.num_workers, pin_memory=pin_memory)
         return dataloader
 
