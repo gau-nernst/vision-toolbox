@@ -31,19 +31,13 @@ def image_loader(path, device='cpu'):
     return img
 
 
-class AveragePool(nn.Sequential):
-    def __init__(self):
-        self.pool = nn.AdaptiveAvgPool2d((1,1))
-        self.flatten = nn.Flatten()
-
-
 class ImageClassifier(pl.LightningModule):
     def __init__(
         self,
         # model
         backbone: Union[str, backbones.BaseBackbone],
         num_classes: int,
-        pool_fn: Callable[..., nn.Module]=AveragePool,
+        include_pool: bool=True,
         
         # data
         train_dir: str=None,
@@ -79,8 +73,9 @@ class ImageClassifier(pl.LightningModule):
         self.save_hyperparameters()
         backbone = backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
         layers = [backbone]
-        if pool_fn is not None:
-            layers.append(pool_fn())
+        if include_pool:
+            layers.append(nn.AdaptiveAvgPool2d((1,1)))
+            layers.append(nn.Flatten())
         layers.append(nn.Linear(backbone.get_out_channels()[-1], num_classes))
         self.model = nn.Sequential(*layers)
 

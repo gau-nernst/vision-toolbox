@@ -1,8 +1,16 @@
+# https://arxiv.org/abs/2112.13692
+# https://github.com/facebookresearch/deit/blob/main/patchconvnet_models.py
 import torch
 from torch import nn
 from torchvision.ops.misc import SqueezeExcitation
 
 from .base import BaseBackbone
+
+
+__all__ = [
+    'AttentionPooling', 'PatchConvNet',
+    'S60', 'S120', 'B60', 'B120', 'L60', 'L120'
+]
 
 
 _S_embed_dim = 384
@@ -43,6 +51,7 @@ configs = {
 }
 
 
+# https://github.com/pytorch/vision/blob/main/torchvision/models/convnext.py#L31
 class LayerNorm2d(nn.LayerNorm):
     def forward(self, x):
         x = x.permute(0, 2, 3, 1)
@@ -96,6 +105,7 @@ class AttentionPooling(nn.Module):
         combined = self.norm_1(combined)
 
         cls_token, _ = self.attn(combined[:,:1], combined, combined, need_weights=False)
+        cls_token = torch.flatten(cls_token, 1)                     # (N, 1, C) -> (N, C)
         cls_token = cls_token + cls_token * self.layer_scale_1
         cls_token = self.norm_2(cls_token)
 
@@ -109,7 +119,7 @@ class AttentionPooling(nn.Module):
 class PatchConvNet(BaseBackbone):
     def __init__(self, embed_dim, depth, mlp_ratio):
         super().__init__()
-        self.out_channels = embed_dim
+        self.out_channels = (embed_dim,)
 
         stem_layers = []
         in_c, out_c = 3, embed_dim // 8
