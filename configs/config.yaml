@@ -17,6 +17,7 @@ trainer:
   strategy: ddp_find_unused_parameters_false
   precision: 16
   benchmark: true
+  sync_batchnorm: true
   max_epochs: 100
 
   logger:
