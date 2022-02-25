@@ -10,6 +10,10 @@ import torchvision
 import torchvision.transforms as T
 import pytorch_lightning as pl
 import webdataset as wds
+try:
+    import timm.optim as timm_optim
+except ImportError:
+    timm_optim = None
 
 from vision_toolbox import backbones
 from extras import RandomCutMixMixUp
@@ -23,6 +27,12 @@ _optimizers = {
     "AdamW": torch.optim.AdamW,
     "RMSprop": partial(torch.optim.RMSprop, momentum=0.9)
 }
+if timm_optim is not None:
+    _timm_optimizers = {
+        "Lamb": timm_optim.Lamb,
+        "Lars": timm_optim.Lars
+    }
+    _optimizers.update(_timm_optimizers)
 
 
 def image_loader(path, device='cpu'):

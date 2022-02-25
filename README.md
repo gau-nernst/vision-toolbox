@@ -53,8 +53,8 @@ To create WebDataset shards
 
 ```bash
 pip install webdataset        # install webdataset
-python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/train --save_dir ./ImageNet/webdataset/train --shuffle True
-python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/val --save_dir ./ImageNet/webdataset/val --shuffle False
+python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/train --save_dir ./ImageNet/webdataset/train --shuffle True --name imagenet-train
+python ./scripts/wds.py --data_dir ./ImageNet/ILSVRC/Data/CLS-LOC/val --save_dir ./ImageNet/webdataset/val --shuffle False --name imagenet-val
 ```
 
 There should be 147 shards of training set, and 7 shards of validation set. Each shard is 1GB.
