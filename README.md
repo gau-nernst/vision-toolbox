@@ -151,7 +151,7 @@ Paper: [[VoVNetV1]](https://arxiv.org/abs/1904.09730) [[VoVNetV2]](https://arxiv
 Backbone           | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
 -------------------|-----------|------------|-----------|--------------
 VoVNet-27-slim     | 69.2      |  2.19      |  4.85     | small
-VoVNet-39          |           | 21.58      | 15.61     | default
+VoVNet-39          | 78.2      | 21.58      | 15.61     | default
 VoVNet-57          |           | 35.62      | 19.33     | default
 VoVNet-19-slim-ese | 70.8      |  2.68      |  4.85     | small
 VoVNet-19-ese      | 75.4      | 10.18      |  9.70     | small

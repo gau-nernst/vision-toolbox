@@ -38,7 +38,8 @@ configs = {
     'vovnet-39': {
         **_base,
         "num_blocks": (1, 1, 2, 2),
-        "ese": False
+        "ese": False,
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39-ced4435d.pth'
     },
     'vovnet-57': {
         **_base,
