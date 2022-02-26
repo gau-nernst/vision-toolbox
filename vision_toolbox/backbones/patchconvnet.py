@@ -1,52 +1,64 @@
 # https://arxiv.org/abs/2112.13692
 # https://github.com/facebookresearch/deit/blob/main/patchconvnet_models.py
+import warnings
+
 import torch
 from torch import nn
-from torchvision.ops.misc import SqueezeExcitation
+try:
+    from torchvision.ops.misc import SqueezeExcitation
+    from torchvision.ops import StochasticDepth
+except ImportError:
+    warnings.warn('torchvision.ops.misc.SqueezeExcitation is not available. Please update your torchvision')
+    SqueezeExcitation = None
 
 from .base import BaseBackbone
 
 
 __all__ = [
     'AttentionPooling', 'PatchConvNet',
-    'S60', 'S120', 'B60', 'B120', 'L60', 'L120'
+    'PatchConvNet_S60', 'PatchConvNet_S120',
+    'PatchConvNet_B60', 'PatchConvNet_B120',
+    'PatchConvNet_L60', 'PatchConvNet_L120'
 ]
 
 
+_base = {
+    'mlp_ratio': 3,
+    'drop_path': 0.3
+}
 _S_embed_dim = 384
 _B_embed_dim = 768
 _L_embed_dim = 1024
-_mlp_ratio = 3
 configs = {
-    'S60': {
+    'PatchConvNet-S60': {
+        **_base,
         'embed_dim': _S_embed_dim,
         'depth': 60,
-        'mlp_ratio': _mlp_ratio
     },
-    'S120': {
+    'PatchConvNet-S120': {
+        **_base,
         'embed_dim': _S_embed_dim,
         'depth': 120,
-        'mlp_ratio': _mlp_ratio
     },
-    'B60': {
+    'PatchConvNet-B60': {
+        **_base,
         'embed_dim': _B_embed_dim,
         'depth': 60,
-        'mlp_ratio': _mlp_ratio
     },
-    'B120': {
+    'PatchConvNet-B120': {
+        **_base,
         'embed_dim': _B_embed_dim,
         'depth': 120,
-        'mlp_ratio': _mlp_ratio
     },
-    'L60': {
+    'PatchConvNet-L60': {
+        **_base,
         'embed_dim': _L_embed_dim,
         'depth': 60,
-        'mlp_ratio': _mlp_ratio
     },
-    'L120': {
+    'PatchConvNet-L120': {
+        **_base,
         'embed_dim': _L_embed_dim,
         'depth': 120,
-        'mlp_ratio': _mlp_ratio
     }
 }
 
@@ -61,7 +73,7 @@ class LayerNorm2d(nn.LayerNorm):
 
 
 class PatchConvBlock(nn.Module):
-    def __init__(self, embed_dim, layer_scale_init=1e-6):
+    def __init__(self, embed_dim, layer_scale_init=1e-6, drop_path=0.3):
         super().__init__()
         self.layers = nn.Sequential(
             LayerNorm2d(embed_dim),
@@ -73,15 +85,17 @@ class PatchConvBlock(nn.Module):
             nn.Conv2d(embed_dim, embed_dim, 1)
         )
         self.layer_scale = nn.Parameter(torch.ones((1,embed_dim,1,1)) * layer_scale_init)
+        self.drop_path = StochasticDepth(drop_path, 'row') if drop_path > 0 else nn.Identity()
 
     def forward(self, x: torch.Tensor):
         # (N, C, H, W)
-        return x + self.layers(x) * self.layer_scale
+        return x + self.drop_path(self.layers(x) * self.layer_scale)
 
 
 class AttentionPooling(nn.Module):
-    def __init__(self, embed_dim, mlp_ratio, layer_scale_init=1e-6):
+    def __init__(self, embed_dim, mlp_ratio, layer_scale_init=1e-6, drop_path=0.3):
         super().__init__()
+        self.drop_path = StochasticDepth(drop_path, 'row') if drop_path > 0 else nn.Identity()
         self.cls_token = nn.Parameter(torch.zeros(embed_dim))
         self.norm_1 = nn.LayerNorm(embed_dim)
 
@@ -106,18 +120,18 @@ class AttentionPooling(nn.Module):
 
         cls_token, _ = self.attn(combined[:,:1], combined, combined, need_weights=False)
         cls_token = torch.flatten(cls_token, 1)                     # (N, 1, C) -> (N, C)
-        cls_token = cls_token + cls_token * self.layer_scale_1
+        cls_token = cls_token + self.drop_path(cls_token * self.layer_scale_1)
         cls_token = self.norm_2(cls_token)
 
         cls_token = self.mlp(cls_token)
-        cls_token = cls_token + cls_token * self.layer_scale_2
-
+        cls_token = cls_token + self.drop_path(cls_token * self.layer_scale_2)
         cls_token = self.norm_3(cls_token)
+
         return cls_token
 
 
 class PatchConvNet(BaseBackbone):
-    def __init__(self, embed_dim, depth, mlp_ratio):
+    def __init__(self, embed_dim, depth, mlp_ratio, drop_path=0.3):
         super().__init__()
         self.out_channels = (embed_dim,)
 
@@ -130,8 +144,8 @@ class PatchConvNet(BaseBackbone):
             in_c, out_c = out_c, out_c * 2
         self.stem = nn.Sequential(*stem_layers)
 
-        self.trunk = nn.Sequential(*[PatchConvBlock(embed_dim) for _ in range(depth)])
-        self.pool = AttentionPooling(embed_dim, mlp_ratio)
+        self.trunk = nn.Sequential(*[PatchConvBlock(embed_dim, drop_path=drop_path) for _ in range(depth)])
+        self.pool = AttentionPooling(embed_dim, mlp_ratio, drop_path=drop_path)
 
     def forward_features(self, x):
         out = self.stem(x)
@@ -144,9 +158,9 @@ class PatchConvNet(BaseBackbone):
         return self.forward_features(x)
 
 
-def S60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['S60'], pretrained=pretrained, **kwargs)
-def S120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['S120'], pretrained=pretrained, **kwargs)
-def B60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['B60'], pretrained=pretrained, **kwargs)
-def B120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['B120'], pretrained=pretrained, **kwargs)
-def L60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['L60'], pretrained=pretrained, **kwargs)
-def L120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['L120'], pretrained=pretrained, **kwargs)
+def PatchConvNet_S60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-S60'], pretrained=pretrained, **kwargs)
+def PatchConvNet_S120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-S120'], pretrained=pretrained, **kwargs)
+def PatchConvNet_B60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-B60'], pretrained=pretrained, **kwargs)
+def PatchConvNet_B120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-B120'], pretrained=pretrained, **kwargs)
+def PatchConvNet_L60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-L60'], pretrained=pretrained, **kwargs)
+def PatchConvNet_L120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-L120'], pretrained=pretrained, **kwargs)

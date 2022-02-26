@@ -1,17 +1,14 @@
-from packaging import version
 from typing import List
 import warnings
 
 import torch
-import torchvision
 from torchvision.models import resnet, mobilenet
-if version.parse(torchvision.__version__) >= version.parse('0.11.0'):
+try:
     from torchvision.models import regnet, efficientnet
     from torchvision.models.feature_extraction import create_feature_extractor
-else:
+except ImportError:
     warnings.warn('torchvision < 0.11.0. torchvision models won\'t be available')
-    regnet = None
-    create_feature_extractor = None
+    regnet = efficientnet = create_feature_extractor = None
 
 from .base import BaseBackbone
 
