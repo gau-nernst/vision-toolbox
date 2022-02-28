@@ -22,18 +22,16 @@ _base = {
     'num_layers': (5, 5, 5, 5)
 }
 _slim = {
-    'stem_channels': (64, 64, 128),
     'stage_channels': (64, 80, 96, 112),
-    'out_channels': (128, 256, 384, 512),
-    'num_layers': (3, 3, 3, 3)
+    'out_channels': (128, 256, 384, 512)
 }
 configs = {
     # VoVNetV1
     'vovnet-27-slim': {
+        **_base,
         **_slim,
         "num_blocks": (1, 1, 1, 1),
         'ese': False,
-        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet27_slim-7ac333a5.pth'
     },
     'vovnet-39': {
         **_base,
@@ -44,18 +42,21 @@ configs = {
     'vovnet-57': {
         **_base,
         "num_blocks": (1, 1, 4, 3),
-        "ese": False
+        "ese": False,
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57-9929476e.pth'
     },
     # VoVNetV2
     'vovnet-19-slim-ese': {
+        **_base,
         **_slim,
+        'num_layers': (3, 3, 3, 3),
         'num_blocks': (1, 1, 1, 1),
         'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_slim_ese-446e2ae9.pth'
     },
     'vovnet-19-ese': {
         **_base,
-        'num_blocks': (1, 1, 1, 1),
         'num_layers': (3, 3, 3, 3),
+        'num_blocks': (1, 1, 1, 1),
         'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_ese-4410fc5f.pth'
     },
     'vovnet-39-ese': {
