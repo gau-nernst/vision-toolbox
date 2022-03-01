@@ -108,7 +108,10 @@ class RandomCutMixMixUp(nn.Module):
         return self.cutmix(batch, target)
 
 
-def extract_backbone_weights(lightning_ckpt_path, save_dir, save_name):
+def extract_backbone_weights(lightning_ckpt_path, save_name, save_dir=None):
+    if save_dir == None:
+        save_dir = os.getcwd()
+
     ckpt = torch.load(lightning_ckpt_path, map_location='cpu')
     state_dict = ckpt['state_dict']
     backbone_token = 'model.0.'

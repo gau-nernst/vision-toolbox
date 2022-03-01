@@ -6,12 +6,10 @@ from torch import nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 import torchvision
+from torchvision.ops import StochasticDepth
 import torchvision.transforms as T
 import pytorch_lightning as pl
-try:
-    import timm.optim as timm_optim
-except ImportError:
-    timm_optim = None
+import timm.optim as timm_optim
 
 from vision_toolbox import backbones
 from extras import RandomCutMixMixUp
@@ -47,11 +45,12 @@ class ImageClassifier(pl.LightningModule):
         num_classes: int,
         include_pool: bool=True,
         
-        # augmentation
+        # augmentation and regularization
         random_erasing_p: float=0.1,
         mixup_alpha: float=0.2,
         cutmix_alpha: float=1.0,
         label_smoothing: float=0.1,
+        drop_path: float=0.3,
         
         # optimizer and scheduler
         optimizer: str="SGD",
@@ -86,6 +85,10 @@ class ImageClassifier(pl.LightningModule):
         
         self.train_transforms = nn.Sequential(*train_transforms)
         self.mixup_cutmix = RandomCutMixMixUp(num_classes, cutmix_alpha, mixup_alpha) if cutmix_alpha > 0 and mixup_alpha > 0 else None
+
+        for m in self.model.modules():
+            if isinstance(m, StochasticDepth):
+                m.p = drop_path
 
         if channels_last:
             self.model = self.model.to(memory_format=torch.channels_last)
