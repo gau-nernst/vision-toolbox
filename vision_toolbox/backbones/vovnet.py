@@ -32,6 +32,7 @@ configs = {
         **_slim,
         "num_blocks": (1, 1, 1, 1),
         'ese': False,
+        'weights': 'https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet27_slim-79617b9c.pth'
     },
     'vovnet-39': {
         **_base,
