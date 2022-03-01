@@ -2,15 +2,16 @@ model:
   backbone: vovnet57
   num_classes: 1000
 
+  optimizer: SGD
+  lr: 0.5
+  weight_decay: 0.00002
+
+data:
   train_dir: ../datasets/ImageNet/ILSVRC/Data/CLS-LOC/train
   val_dir: ../datasets/ImageNet/ILSVRC/Data/CLS-LOC/val
 
   batch_size: 512
   num_workers: 8
-
-  optimizer: SGD
-  lr: 0.5
-  weight_decay: 0.00002
 
 trainer:
   gpus: 2

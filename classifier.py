@@ -1,15 +1,13 @@
 from functools import partial
-from typing import Callable, Union
+from typing import Union
 
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
-from torch.utils.data import DataLoader
 import torchvision
 import torchvision.transforms as T
 import pytorch_lightning as pl
-import webdataset as wds
 try:
     import timm.optim as timm_optim
 except ImportError:
@@ -49,35 +47,23 @@ class ImageClassifier(pl.LightningModule):
         num_classes: int,
         include_pool: bool=True,
         
-        # data
-        train_dir: str=None,
-        val_dir: str=None,
-        batch_size: int=128,
-        num_workers: int=4,
-        train_crop_size: int=176,
-        val_resize_size: int=232,
-        val_crop_size: int=224,
-        
         # augmentation
         random_erasing_p: float=0.1,
         mixup_alpha: float=0.2,
         cutmix_alpha: float=1.0,
+        label_smoothing: float=0.1,
         
         # optimizer and scheduler
         optimizer: str="SGD",
         lr: float=0.05,
         weight_decay: float=2e-5,
         norm_weight_decay: float=0,
-        label_smoothing: float=0.1,
         warmup_epochs: int=5,
         warmup_decay: float=0.01,
 
         # others
         jit: bool=False,
-        channels_last: bool=False,
-        webdataset: bool=False,
-        train_size: int=0,
-        val_size: int=0
+        channels_last: bool=False
         ):
         super().__init__()
         self.save_hyperparameters()
@@ -105,44 +91,6 @@ class ImageClassifier(pl.LightningModule):
             self.model = self.model.to(memory_format=torch.channels_last)
         if jit:
             self.model = torch.jit.script(self.model)
-
-    def get_dataloader(self, transform, training=False, pin_memory=True):
-        data_dir = self.hparams.train_dir if training else self.hparams.val_dir
-        if self.hparams.webdataset:
-            # https://webdataset.github.io/webdataset/multinode/
-            # https://github.com/webdataset/webdataset-lightning/blob/main/train.py
-            ds = (
-                wds.WebDataset(data_dir, shardshuffle=training)
-                .shuffle(1000 if training else 0)
-                .decode("pil")
-                .to_tuple("jpg;jpeg;png cls")
-                .map_tuple(transform, lambda x: x)
-                .batched(self.hparams.batch_size, partial=not training)
-            )
-            dataloader = wds.WebLoader(ds, batch_size=None, num_workers=self.hparams.num_workers, pin_memory=pin_memory)
-            if training:
-                dataloader = dataloader.ddp_equalize(self.hparams.train_size//self.hparams.batch_size)
-        else:
-            ds = torchvision.datasets.ImageFolder(data_dir, transform=transform)
-            dataloader = DataLoader(ds, batch_size=self.hparams.batch_size, shuffle=training, num_workers=self.hparams.num_workers, pin_memory=pin_memory)
-        return dataloader
-
-    def train_dataloader(self):
-        transform = T.Compose([
-            T.RandomResizedCrop(self.hparams.train_crop_size),
-            T.PILToTensor()
-        ])
-        return self.get_dataloader(transform, training=True)
-
-    def val_dataloader(self):
-        transform = T.Compose([
-            T.Resize(self.hparams.val_resize_size),
-            T.CenterCrop(self.hparams.val_crop_size),
-            T.PILToTensor(),
-            T.ConvertImageDtype(torch.float),
-            T.Normalize(mean=(0,0,0), std=(1,1,1))
-        ])
-        return self.get_dataloader(transform, training=False)
 
     def training_step(self, batch, batch_idx):
         images, labels = batch

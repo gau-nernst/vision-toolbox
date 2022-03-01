@@ -1,4 +1,4 @@
-model:
+data:
   webdataset: true
   train_dir: ../datasets/ImageNet/webdataset/train/imagenet-train-{000000..000146}.tar
   val_dir: ../datasets/ImageNet/webdataset/val/imagenet-val-{000000..000006}.tar
