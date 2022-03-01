@@ -64,6 +64,7 @@ configs = {
 
 
 # https://github.com/pytorch/vision/blob/main/torchvision/models/convnext.py#L31
+# this is very slow
 class LayerNorm2d(nn.LayerNorm):
     def forward(self, x):
         x = x.permute(0, 2, 3, 1)
@@ -76,7 +77,8 @@ class PatchConvBlock(nn.Module):
     def __init__(self, embed_dim, layer_scale_init=1e-6, drop_path=0.3):
         super().__init__()
         self.layers = nn.Sequential(
-            LayerNorm2d(embed_dim),
+            # LayerNorm2d(embed_dim),
+            nn.BatchNorm2d(embed_dim),
             nn.Conv2d(embed_dim, embed_dim, 1),
             nn.GELU(),
             nn.Conv2d(embed_dim, embed_dim, 3, padding=1, groups=embed_dim),
@@ -84,7 +86,7 @@ class PatchConvBlock(nn.Module):
             SqueezeExcitation(embed_dim, embed_dim // 4),
             nn.Conv2d(embed_dim, embed_dim, 1)
         )
-        self.layer_scale = nn.Parameter(torch.ones((1,embed_dim,1,1)) * layer_scale_init)
+        self.layer_scale = nn.Parameter(torch.ones((embed_dim,1,1)) * layer_scale_init)
         self.drop_path = StochasticDepth(drop_path, 'row') if drop_path > 0 else nn.Identity()
 
     def forward(self, x: torch.Tensor):
@@ -146,6 +148,15 @@ class PatchConvNet(BaseBackbone):
 
         self.trunk = nn.Sequential(*[PatchConvBlock(embed_dim, drop_path=drop_path) for _ in range(depth)])
         self.pool = AttentionPooling(embed_dim, mlp_ratio, drop_path=drop_path)
+
+        nn.init.trunc_normal_(self.pool.cls_token, std=0.02)
+        nn.init.trunc_normal_(self.pool.attn.in_proj_weight, std=0.02)
+        nn.init.trunc_normal_(self.pool.attn.out_proj.weight, std=0.02)
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.Linear)):
+                nn.init.trunc_normal_(m.weight, std=0.02)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def forward_features(self, x):
         out = self.stem(x)
