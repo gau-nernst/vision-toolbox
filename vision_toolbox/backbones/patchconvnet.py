@@ -16,15 +16,16 @@ from .base import BaseBackbone
 
 __all__ = [
     'AttentionPooling', 'PatchConvNet',
-    'PatchConvNet_S60', 'PatchConvNet_S120',
-    'PatchConvNet_B60', 'PatchConvNet_B120',
-    'PatchConvNet_L60', 'PatchConvNet_L120'
+    'patchconvnet_s60', 'patchconvnet_s120',
+    'patchconvnet_b60', 'patchconvnet_b120',
+    'patchconvnet_l60', 'patchconvnet_l120'
 ]
 
 
 _base = {
     'mlp_ratio': 3,
-    'drop_path': 0.3
+    'drop_path': 0.3,
+    'layer_scale_init': 1e-6
 }
 _S_embed_dim = 384
 _B_embed_dim = 768
@@ -63,39 +64,56 @@ configs = {
 }
 
 
-# https://github.com/pytorch/vision/blob/main/torchvision/models/convnext.py#L31
-# this is very slow
-class LayerNorm2d(nn.LayerNorm):
+class Permute(nn.Module):
+    def __init__(self, *dims):
+        super().__init__()
+        self.dims = dims
+
     def forward(self, x):
-        x = x.permute(0, 2, 3, 1)
-        x = super().forward(x)
-        x = x.permute(0, 3, 1, 2)
-        return x
+        return torch.permute(x, self.dims)
 
 
 class PatchConvBlock(nn.Module):
-    def __init__(self, embed_dim, layer_scale_init=1e-6, drop_path=0.3):
+    def __init__(self, embed_dim, drop_path=0.3, layer_scale_init=1e-6, norm_type='bn'):
+        assert norm_type in ('bn', 'ln')
         super().__init__()
-        self.layers = nn.Sequential(
-            # LayerNorm2d(embed_dim),
-            nn.BatchNorm2d(embed_dim),
-            nn.Conv2d(embed_dim, embed_dim, 1),
-            nn.GELU(),
-            nn.Conv2d(embed_dim, embed_dim, 3, padding=1, groups=embed_dim),
-            nn.GELU(),
-            SqueezeExcitation(embed_dim, embed_dim // 4),
-            nn.Conv2d(embed_dim, embed_dim, 1)
-        )
-        self.layer_scale = nn.Parameter(torch.ones((embed_dim,1,1)) * layer_scale_init)
+        if norm_type == 'ln':
+            # LayerNorm version. Primary format is (N, H, W, C)
+            # follow this approach https://github.com/pytorch/vision/blob/main/torchvision/models/convnext.py
+            self.layers = nn.Sequential(
+                nn.LayerNorm(embed_dim),
+                nn.Linear(embed_dim, embed_dim),
+                nn.GELU(),
+                Permute(0, 3, 1, 2),        # (N, H, W, C) -> (N, C, H, W)
+                nn.Conv2d(embed_dim, embed_dim, 3, padding=1, groups=embed_dim),    # dw-conv
+                nn.GELU(),
+                SqueezeExcitation(embed_dim, embed_dim // 4),
+                Permute(0, 2, 3, 1),        # (N, C, H, W) -> (N, H, W, C)
+                nn.Linear(embed_dim, embed_dim)
+            )
+            self.layer_scale = nn.Parameter(torch.ones(embed_dim) * layer_scale_init)
+
+        else:
+            # BatchNorm version. Primary format is (N, C, H, W)
+            self.layers = nn.Sequential(
+                nn.BatchNorm2d(embed_dim),
+                nn.Conv2d(embed_dim, embed_dim, 1),
+                nn.GELU(),
+                nn.Conv2d(embed_dim, embed_dim, 3, padding=1, groups=embed_dim),
+                nn.GELU(),
+                SqueezeExcitation(embed_dim, embed_dim // 4),
+                nn.Conv2d(embed_dim, embed_dim, 1)
+            )
+            self.layer_scale = nn.Parameter(torch.ones(embed_dim, 1, 1) * layer_scale_init)
+        
         self.drop_path = StochasticDepth(drop_path, 'row') if drop_path > 0 else nn.Identity()
 
     def forward(self, x: torch.Tensor):
-        # (N, C, H, W)
         return x + self.drop_path(self.layers(x) * self.layer_scale)
 
 
 class AttentionPooling(nn.Module):
-    def __init__(self, embed_dim, mlp_ratio, layer_scale_init=1e-6, drop_path=0.3):
+    def __init__(self, embed_dim, mlp_ratio, drop_path=0.3, layer_scale_init=1e-6):
         super().__init__()
         self.drop_path = StochasticDepth(drop_path, 'row') if drop_path > 0 else nn.Identity()
         self.cls_token = nn.Parameter(torch.zeros(embed_dim))
@@ -117,38 +135,43 @@ class AttentionPooling(nn.Module):
     def forward(self, x: torch.Tensor):
         # (N, HW, C)
         cls_token = self.cls_token.expand(x.shape[0], 1, -1)
-        combined = torch.cat((cls_token, x), dim=1)
-        combined = self.norm_1(combined)
+        out = torch.cat((cls_token, x), dim=1)
 
-        cls_token, _ = self.attn(combined[:,:1], combined, combined, need_weights=False)
-        cls_token = torch.flatten(cls_token, 1)                     # (N, 1, C) -> (N, C)
-        cls_token = cls_token + self.drop_path(cls_token * self.layer_scale_1)
-        cls_token = self.norm_2(cls_token)
+        # attention pooling. q = cls_token. k = v = (cls_token, x)
+        out = self.norm_1(out)
+        out = self.attn(out[:,:1], out, out, need_weights=False)[0]
+        cls_token = cls_token + self.drop_path(out * self.layer_scale_1)    # residual + layer scale + dropout
 
-        cls_token = self.mlp(cls_token)
-        cls_token = cls_token + self.drop_path(cls_token * self.layer_scale_2)
-        cls_token = self.norm_3(cls_token)
-
-        return cls_token
+        # mlp
+        out = self.norm_2(cls_token)
+        out = self.mlp(out)
+        cls_token = cls_token + self.drop_path(out * self.layer_scale_2)
+        
+        out = self.norm_3(cls_token).squeeze(1)     # (N, 1, C) -> (N, C)
+        return out
 
 
 class PatchConvNet(BaseBackbone):
-    def __init__(self, embed_dim, depth, mlp_ratio, drop_path=0.3):
+    def __init__(self, embed_dim, depth, mlp_ratio, drop_path, layer_scale_init, norm_type='bn'):
+        assert norm_type in ('bn', 'ln')
         super().__init__()
+        self.norm_type = norm_type
         self.out_channels = (embed_dim,)
+        self.stem = nn.Sequential(
+            nn.Conv2d(3, embed_dim // 8, 3, stride=2, padding=1),
+            nn.GELU(),
+            nn.Conv2d(embed_dim//8, embed_dim // 4, 3, stride=2, padding=1),
+            nn.GELU(),
+            nn.Conv2d(embed_dim//4, embed_dim // 2, 3, stride=2, padding=1),
+            nn.GELU(),
+            nn.Conv2d(embed_dim//2, embed_dim, 3, stride=2, padding=1),
+        )
 
-        stem_layers = []
-        in_c, out_c = 3, embed_dim // 8
-        for _ in range(4):
-            # original code uses bias=False even though there is no norm layer
-            stem_layers.append(nn.Conv2d(in_c, out_c, 3, stride=2, padding=1))
-            stem_layers.append(nn.GELU())
-            in_c, out_c = out_c, out_c * 2
-        self.stem = nn.Sequential(*stem_layers)
+        kwargs = dict(drop_path=drop_path, layer_scale_init=layer_scale_init)
+        self.trunk = nn.Sequential(*[PatchConvBlock(embed_dim, norm_type=norm_type, **kwargs) for _ in range(depth)])
+        self.pool = AttentionPooling(embed_dim, mlp_ratio, **kwargs)
 
-        self.trunk = nn.Sequential(*[PatchConvBlock(embed_dim, drop_path=drop_path) for _ in range(depth)])
-        self.pool = AttentionPooling(embed_dim, mlp_ratio, drop_path=drop_path)
-
+        # weight initialization
         nn.init.trunc_normal_(self.pool.cls_token, std=0.02)
         nn.init.trunc_normal_(self.pool.attn.in_proj_weight, std=0.02)
         nn.init.trunc_normal_(self.pool.attn.out_proj.weight, std=0.02)
@@ -158,10 +181,19 @@ class PatchConvNet(BaseBackbone):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    def forward_features(self, x):
+    def forward_features(self, x: torch.Tensor):
         out = self.stem(x)
-        out = self.trunk(out)
-        out = out.flatten(-2).transpose(-1, -2)         # (N, C, H, W) -> (N, HW, C)
+
+        if self.norm_type == 'ln':
+            # layer norm
+            out = torch.permute(out, (0, 2, 3, 1))      # (N, C, H, W) -> (N, H, W, C)
+            out = self.trunk(out)
+            out = torch.flatten(out, 1, 2)              # (N, H, W, C) -> (N, HW, C)
+        else:
+            # batch norm
+            out = self.trunk(out)
+            out = out.flatten(2).transpose(1, 2)        # (N, C, H, W) -> (N, HW, C)
+        
         out = self.pool(out)
         return out
 
@@ -169,9 +201,9 @@ class PatchConvNet(BaseBackbone):
         return self.forward_features(x)
 
 
-def PatchConvNet_S60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-S60'], pretrained=pretrained, **kwargs)
-def PatchConvNet_S120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-S120'], pretrained=pretrained, **kwargs)
-def PatchConvNet_B60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-B60'], pretrained=pretrained, **kwargs)
-def PatchConvNet_B120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-B120'], pretrained=pretrained, **kwargs)
-def PatchConvNet_L60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-L60'], pretrained=pretrained, **kwargs)
-def PatchConvNet_L120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-L120'], pretrained=pretrained, **kwargs)
+def patchconvnet_s60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-S60'], pretrained=pretrained, **kwargs)
+def patchconvnet_s120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-S120'], pretrained=pretrained, **kwargs)
+def patchconvnet_b60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-B60'], pretrained=pretrained, **kwargs)
+def patchconvnet_b120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-B120'], pretrained=pretrained, **kwargs)
+def patchconvnet_l60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-L60'], pretrained=pretrained, **kwargs)
+def patchconvnet_l120(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-L120'], pretrained=pretrained, **kwargs)
