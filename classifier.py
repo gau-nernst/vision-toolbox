@@ -50,7 +50,7 @@ class ImageClassifier(pl.LightningModule):
         mixup_alpha: float=0.2,
         cutmix_alpha: float=1.0,
         label_smoothing: float=0.1,
-        drop_path: float=0.3,
+        drop_path: float=None,
         
         # optimizer and scheduler
         optimizer: str="SGD",
@@ -86,9 +86,11 @@ class ImageClassifier(pl.LightningModule):
         self.train_transforms = nn.Sequential(*train_transforms)
         self.mixup_cutmix = RandomCutMixMixUp(num_classes, cutmix_alpha, mixup_alpha) if cutmix_alpha > 0 and mixup_alpha > 0 else None
 
-        for m in self.model.modules():
-            if isinstance(m, StochasticDepth):
-                m.p = drop_path
+        if drop_path is not None:
+            for m in self.model.modules():
+                # if during model creation, drop_path=0, no StochasticDepth layer is created, this won't work
+                if isinstance(m, StochasticDepth):
+                    m.p = drop_path
 
         if channels_last:
             self.model = self.model.to(memory_format=torch.channels_last)
