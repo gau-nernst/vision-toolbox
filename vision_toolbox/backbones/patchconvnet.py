@@ -157,14 +157,18 @@ class PatchConvNet(BaseBackbone):
         super().__init__()
         self.norm_type = norm_type
         self.out_channels = (embed_dim,)
+        
+        # stem has no bias and no last activation layer
+        # https://github.com/facebookresearch/deit/issues/151
+        kwargs = dict(kernel_size=3, stride=2, padding=1, bias=False)
         self.stem = nn.Sequential(
-            nn.Conv2d(3, embed_dim // 8, 3, stride=2, padding=1),
+            nn.Conv2d(3, embed_dim // 8, **kwargs),
             nn.GELU(),
-            nn.Conv2d(embed_dim//8, embed_dim // 4, 3, stride=2, padding=1),
+            nn.Conv2d(embed_dim//8, embed_dim // 4, **kwargs),
             nn.GELU(),
-            nn.Conv2d(embed_dim//4, embed_dim // 2, 3, stride=2, padding=1),
+            nn.Conv2d(embed_dim//4, embed_dim // 2, **kwargs),
             nn.GELU(),
-            nn.Conv2d(embed_dim//2, embed_dim, 3, stride=2, padding=1),
+            nn.Conv2d(embed_dim//2, embed_dim, **kwargs),
         )
 
         kwargs = dict(drop_path=drop_path, layer_scale_init=layer_scale_init)
