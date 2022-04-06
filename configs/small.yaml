@@ -1,6 +1,8 @@
 model:
   # turn off augmentation, only use TrivialAugment
-  random_erasing_p: 0
   mixup_alpha: 0
   cutmix_alpha: 0
   label_smoothing: 0
+
+data:
+  random_erasing_p: 0

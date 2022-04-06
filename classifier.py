@@ -9,26 +9,13 @@ import torchvision
 from torchvision.ops import StochasticDepth
 import torchvision.transforms as T
 import pytorch_lightning as pl
-import timm.optim as timm_optim
+import timm.optim
 
 from vision_toolbox import backbones
 from extras import RandomCutMixMixUp
 
 # https://github.com/pytorch/vision/blob/main/references/classification/train.py
 # https://pytorch.org/blog/how-to-train-state-of-the-art-models-using-torchvision-latest-primitives/
-
-_optimizers = {
-    "SGD": partial(torch.optim.SGD, momentum=0.9),
-    "Adam": torch.optim.Adam,
-    "AdamW": torch.optim.AdamW,
-    "RMSprop": partial(torch.optim.RMSprop, momentum=0.9)
-}
-if timm_optim is not None:
-    _timm_optimizers = {
-        "Lamb": timm_optim.Lamb,
-        "Lars": timm_optim.Lars
-    }
-    _optimizers.update(_timm_optimizers)
 
 
 def image_loader(path, device='cpu'):
@@ -46,19 +33,23 @@ class ImageClassifier(pl.LightningModule):
         include_pool: bool=True,
         
         # augmentation and regularization
-        random_erasing_p: float=0.1,
         mixup_alpha: float=0.2,
         cutmix_alpha: float=1.0,
-        label_smoothing: float=0.1,
-        drop_path: float=None,
         
-        # optimizer and scheduler
-        optimizer: str="SGD",
-        lr: float=0.05,
+        # regularization
         weight_decay: float=2e-5,
         norm_weight_decay: float=0,
+        bias_weight_decay: float=0,
+        label_smoothing: float=0.1,
+        drop_path: float=None,
+
+        # optimizer and scheduler
+        optimizer: str="SGD",
+        momentum: float=0.9,
+        lr: float=0.05,
+        decay_factor: float=0,
         warmup_epochs: int=5,
-        warmup_decay: float=0.01,
+        warmup_factor: float=0.01,
 
         # others
         jit: bool=False,
@@ -74,16 +65,6 @@ class ImageClassifier(pl.LightningModule):
         layers.append(nn.Linear(backbone.get_out_channels()[-1], num_classes))
         self.model = nn.Sequential(*layers)
 
-        train_transforms = [
-            T.RandomHorizontalFlip(),
-            T.autoaugment.TrivialAugmentWide(interpolation=T.InterpolationMode.BILINEAR),
-            T.ConvertImageDtype(torch.float),
-            T.Normalize(mean=(0,0,0), std=(1,1,1)),
-        ]
-        if random_erasing_p > 0:
-            train_transforms.append(T.RandomErasing(p=random_erasing_p, value="random"))
-        
-        self.train_transforms = nn.Sequential(*train_transforms)
         self.mixup_cutmix = RandomCutMixMixUp(num_classes, cutmix_alpha, mixup_alpha) if cutmix_alpha > 0 and mixup_alpha > 0 else None
 
         if drop_path is not None:
@@ -99,7 +80,6 @@ class ImageClassifier(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         images, labels = batch
-        images = self.train_transforms(images)
         
         if self.mixup_cutmix is not None:
             images, labels = self.mixup_cutmix(images, labels)
@@ -108,7 +88,7 @@ class ImageClassifier(pl.LightningModule):
 
         logits = self.model(images)
         loss = F.cross_entropy(logits, labels, label_smoothing=self.hparams.label_smoothing)
-        self.log("train/loss", loss, sync_dist=True)
+        self.log("train/loss", loss)
         
         return loss
 
@@ -124,36 +104,62 @@ class ImageClassifier(pl.LightningModule):
         preds = torch.argmax(logits, dim=-1)
         correct = (labels == preds).sum()
         acc = correct / labels.numel()
-        self.log("val/acc", acc, sync_dist=True)
+        self.log("val/acc", acc)
 
     def configure_optimizers(self):
-        if self.hparams.norm_weight_decay is not None:
-            # https://github.com/pytorch/vision/blob/main/torchvision/ops/_utils.py
-            norm_classes = (nn.modules.batchnorm._BatchNorm, nn.LayerNorm, nn.GroupNorm)
-            
-            norm_params = []
-            other_params = []
-            for module in self.modules():
-                if next(module.children(), None):
-                    other_params.extend(p for p in module.parameters(recurse=False) if p.requires_grad)
-                elif isinstance(module, norm_classes):
-                    norm_params.extend(p for p in module.parameters() if p.requires_grad)
-                else:
-                    other_params.extend(p for p in module.parameters() if p.requires_grad)
-
-            param_groups = (norm_params, other_params)
-            wd_groups = (self.hparams.norm_weight_decay, self.hparams.weight_decay)
-            parameters = [{"params": p, "weight_decay": w} for p, w in zip(param_groups, wd_groups) if p]
-
-        else:
-            parameters = self.parameters()
-
-        optimizer = _optimizers[self.hparams.optimizer](parameters, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        # split parameters
+        # https://github.com/pytorch/vision/blob/main/torchvision/ops/_utils.py
+        norm_classes = (nn.modules.batchnorm._BatchNorm, nn.LayerNorm, nn.GroupNorm)
+        layer_classes = (nn.Linear, nn.modules.conv._ConvNd)
         
-        lr_scheduler = CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs-self.hparams.warmup_epochs)
-        if self.hparams.warmup_epochs > 0:
-            warmup_scheduler = LinearLR(optimizer, start_factor=self.hparams.warmup_decay, total_iters=self.hparams.warmup_epochs)
-            lr_scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, lr_scheduler], milestones=[self.hparams.warmup_epochs])
+        norm_params = []
+        bias_params = []
+        other_params = []
+        for module in self.modules():
+            if next(module.children(), None):
+                other_params.extend(p for p in module.parameters(recurse=False) if p.requires_grad)
+            elif isinstance(module, norm_classes):
+                norm_params.extend(p for p in module.parameters() if p.requires_grad)
+            elif isinstance(module, layer_classes):
+                if module.weight.requires_grad:
+                    other_params.append(module.weight)
+                if module.bias is not None and module.bias.requires_grad:
+                    bias_params.append(module.bias)
+            else:
+                other_params.extend(p for p in module.parameters() if p.requires_grad)
+
+        wd = self.hparams.weight_decay
+        norm_wd = self.hparams.norm_weight_decay
+        bias_wd = self.hparams.bias_weight_decay
+        parameters = [
+            {"params": norm_params, "weight_decay": norm_wd if norm_wd is not None else wd},
+            {"params": bias_params, "weight_decay": bias_wd if bias_wd is not None else wd},
+            {"params": other_params, "weight_decay": wd}
+        ]
+        parameters = [x for x in parameters if x["params"]]     # remove empty params groups
+
+        # build optimizer
+        optimizer_name = self.hparams.optimizer
+        lr = self.hparams.lr
+        momentum = self.hparams.momentum
+        if optimizer_name in ("SGD", "RMSprop"):
+            optimizer_cls = partial(getattr(torch.optim, optimizer_name), momentum=momentum)
+        elif hasattr(torch.optim, optimizer_name):
+            optimizer_cls = getattr(optimizer_name)
+        elif hasattr(timm.optim, optimizer_name):
+            optimizer_cls = getattr(optimizer_name)
+        else:
+            raise ValueError(f'{optimizer_name} optimizer is not supported')
+        optimizer = optimizer_cls(parameters, lr=lr, weight_decay=wd)
+        
+        # build scheduler
+        warmup_epochs = self.hparams.warmup_epochs
+        warmup_factor = self.hparams.warmup_factor
+        decay_factor = self.hparams.decay_factor
+        lr_scheduler = CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs - warmup_epochs, eta_min=lr * decay_factor)
+        if warmup_epochs > 0:
+            warmup_scheduler = LinearLR(optimizer, start_factor=warmup_factor, total_iters=warmup_epochs)
+            lr_scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, lr_scheduler], milestones=[warmup_epochs])
             
             # https://github.com/pytorch/pytorch/issues/67318
             if not hasattr(lr_scheduler, "optimizer"):

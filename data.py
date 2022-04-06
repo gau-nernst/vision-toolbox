@@ -1,4 +1,5 @@
 import torch
+import torch.distributed
 from torch.utils.data import DataLoader
 import torchvision
 import torchvision.transforms as T
@@ -18,7 +19,8 @@ class ImageDataModule(pl.LightningDataModule):
         val_crop_size: int=224,
         webdataset: bool=False,
         train_size: int=0,
-        val_size: int=0
+        val_size: int=0,
+        random_erasing_p: float=0.1,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -33,7 +35,6 @@ class ImageDataModule(pl.LightningDataModule):
                 .decode("pil")
                 .to_tuple("jpg;jpeg;png cls")
                 .map_tuple(transform, lambda x: x)
-                .batched(self.hparams.batch_size, partial=not training)
             )
         else:
             ds = torchvision.datasets.ImageFolder(data_dir, transform=transform)
@@ -42,33 +43,38 @@ class ImageDataModule(pl.LightningDataModule):
     def setup(self, stage=None):
         train_transform = T.Compose([
             T.RandomResizedCrop(self.hparams.train_crop_size),
-            T.PILToTensor()
+            T.RandomHorizontalFlip(),
+            T.TrivialAugmentWide(interpolation=T.InterpolationMode.BILINEAR),
+            T.ToTensor(),
+            T.RandomErasing(p=self.hparams.random_erasing_p, value="random"),
         ])
         val_transform = T.Compose([
             T.Resize(self.hparams.val_resize_size),
             T.CenterCrop(self.hparams.val_crop_size),
-            T.PILToTensor(),
-            T.ConvertImageDtype(torch.float),
-            T.Normalize(mean=(0,0,0), std=(1,1,1))
+            T.ToTensor(),
         ])
         self.train_ds = self._get_dataset(self.hparams.train_dir, train_transform, True)
         self.val_ds = self._get_dataset(self.hparams.val_dir, val_transform, False)
 
     def _get_dataloader(self, ds, pin_memory=True, training=False):
+        batch_size = self.hparams.batch_size
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            batch_size //= torch.distributed.get_world_size()
+
         if self.hparams.webdataset:
             dataloader = wds.WebLoader(
-                ds,
+                ds.batched(batch_size, partial=not training),
                 batch_size=None,
                 num_workers=self.hparams.num_workers,
                 pin_memory=pin_memory
             )
             if training:
-                num_batches = self.hparams.train_size//self.hparams.batch_size
+                num_batches = self.hparams.train_size // batch_size
                 dataloader = dataloader.ddp_equalize(num_batches)
         else:
             dataloader = DataLoader(
                 ds,
-                batch_size=self.hparams.batch_size,
+                batch_size=batch_size,
                 shuffle=training,
                 num_workers=self.hparams.num_workers,
                 pin_memory=pin_memory

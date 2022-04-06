@@ -14,7 +14,8 @@ data:
   num_workers: 8
 
 trainer:
-  gpus: 2
+  accelerator: gpu
+  devices: 2
   strategy: ddp_find_unused_parameters_false
   precision: 16
   benchmark: true
