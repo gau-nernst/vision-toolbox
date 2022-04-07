@@ -41,6 +41,7 @@ class ImageClassifier(pl.LightningModule):
         norm_weight_decay: float=0,
         bias_weight_decay: float=0,
         label_smoothing: float=0.1,
+        drop_out: float=None,
         drop_path: float=None,
 
         # optimizer and scheduler
@@ -62,14 +63,16 @@ class ImageClassifier(pl.LightningModule):
         if include_pool:
             layers.append(nn.AdaptiveAvgPool2d((1,1)))
             layers.append(nn.Flatten())
-        layers.append(nn.Linear(backbone.get_out_channels()[-1], num_classes))
+        layers.append(nn.Linear(backbone.get_last_out_channels(), num_classes))
         self.model = nn.Sequential(*layers)
 
         self.mixup_cutmix = RandomCutMixMixUp(num_classes, cutmix_alpha, mixup_alpha) if cutmix_alpha > 0 and mixup_alpha > 0 else None
-
+        if drop_out is not None:
+            for m in self.model.modules():
+                if isinstance(m, nn.modules.dropout._DropoutNd):
+                    m.p = drop_out
         if drop_path is not None:
             for m in self.model.modules():
-                # if during model creation, drop_path=0, no StochasticDepth layer is created, this won't work
                 if isinstance(m, StochasticDepth):
                     m.p = drop_path
 
@@ -118,13 +121,16 @@ class ImageClassifier(pl.LightningModule):
         for module in self.modules():
             if next(module.children(), None):
                 other_params.extend(p for p in module.parameters(recurse=False) if p.requires_grad)
+
             elif isinstance(module, norm_classes):
                 norm_params.extend(p for p in module.parameters() if p.requires_grad)
+
             elif isinstance(module, layer_classes):
                 if module.weight.requires_grad:
                     other_params.append(module.weight)
                 if module.bias is not None and module.bias.requires_grad:
                     bias_params.append(module.bias)
+                    
             else:
                 other_params.extend(p for p in module.parameters() if p.requires_grad)
 

@@ -62,12 +62,10 @@ class CSPDarknetStage(nn.Module):
 
 
 class Darknet(BaseBackbone):
-    def __init__(self, stem_channels, num_blocks, num_channels, stage_fn=DarknetStage, num_returns=4):
-        assert num_returns <= 5
+    def __init__(self, stem_channels, num_blocks, num_channels, stage_fn=DarknetStage):
         super().__init__() 
-        self.out_channels = tuple(num_channels)[-num_returns:]
+        self.out_channels = tuple(num_channels)
         self.stride = 32
-        self.num_returns = num_returns
 
         self.stem = ConvBnAct(3, stem_channels)
         self.stages = nn.ModuleList()
@@ -76,23 +74,20 @@ class Darknet(BaseBackbone):
             self.stages.append(stage_fn(n, in_c, c) if n > 0 else ConvBnAct(in_c, c, stride=2))
             in_c = c
         
-    def forward_features(self, x):
+    def get_feature_maps(self, x):
         outputs = []
         out = self.stem(x)
         for s in self.stages:
             out = s(out)
             outputs.append(out)
-        
-        return outputs[-self.num_returns:]
+        return outputs
 
 
 class DarknetYolov5(BaseBackbone):
-    def __init__(self, stem_channels, num_blocks, num_channels, stage_fn=CSPDarknetStage, num_returns=4):
-        assert num_returns <= 5
+    def __init__(self, stem_channels, num_blocks, num_channels, stage_fn=CSPDarknetStage):
         super().__init__()
-        self.out_channels = tuple(num_channels)[-num_returns:]
+        self.out_channels = tuple(num_channels)
         self.stride = 32
-        self.num_returns = num_returns
 
         self.stem = ConvBnAct(3, stem_channels, kernel_size=6, stride=2, padding=2)
         self.stages = nn.ModuleList()
@@ -101,11 +96,11 @@ class DarknetYolov5(BaseBackbone):
             self.stages.append(stage_fn(n, in_c, c))
             in_c = c
 
-    def forward_features(self, x):
+    def get_feature_maps(self, x):
         outputs = [self.stem(x)]
         for s in self.stages:
             outputs.append(s(outputs[-1]))
-        return outputs[-self.num_returns:]
+        return outputs
 
 
 _base = {

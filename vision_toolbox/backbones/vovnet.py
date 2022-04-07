@@ -16,7 +16,7 @@ __all__ = [
 
 # https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py
 _base = {
-    'stem_channels': (64, 64, 128),
+    'stem_channels': 128,
     'stage_channels': (128, 160, 192, 224),
     'out_channels': (256, 512, 768, 1024),
     'num_layers': (5, 5, 5, 5)
@@ -108,19 +108,19 @@ class OSABlock(nn.Module):
 
 
 class VoVNet(BaseBackbone):
-    def __init__(self, stem_channels, num_blocks, stage_channels, num_layers, out_channels, residual=True, ese=True, num_returns=4):
+    def __init__(self, stem_channels, num_blocks, stage_channels, num_layers, out_channels, residual=True, ese=True):
         super().__init__()
-        self.out_channels = tuple(out_channels)[-num_returns:]
+        self.out_channels = (stem_channels,) + tuple(out_channels)
         self.stride = 32
-        self.num_returns = num_returns
         
-        self.stem = nn.Sequential()
-        in_c = 3
-        for i, c in enumerate(stem_channels):
-            self.stem.add_module(str(i), ConvBnAct(in_c, c, stride=2 if i == 0 else 1))
-            in_c = c
+        self.stem = nn.Sequential(
+            ConvBnAct(3, stem_channels // 2, stride=2),
+            ConvBnAct(stem_channels // 2, stem_channels // 2),
+            ConvBnAct(stem_channels // 2, stem_channels)
+        )
         
         self.stages = nn.ModuleList()
+        in_c = stem_channels
         for n, stage_c, n_l, out_c in zip(num_blocks, stage_channels, num_layers, out_channels):
             stage = nn.Sequential()
             stage.add_module('max_pool', nn.MaxPool2d(3, 2, padding=1))
@@ -129,15 +129,11 @@ class VoVNet(BaseBackbone):
                 in_c = out_c
             self.stages.append(stage)
 
-    def forward_features(self, x):
-        outputs = []
-        out = self.stem(x)
-        outputs.append(out)
+    def get_feature_maps(self, x):
+        outputs = [self.stem(x)]
         for s in self.stages:
-            out = s(out)
-            outputs.append(out)
-        
-        return outputs[-self.num_returns:]
+            outputs.append(s(outputs[-1]))
+        return outputs
 
 
 def vovnet27_slim(pretrained=False, **kwargs): return VoVNet.from_config(configs["vovnet-27-slim"], pretrained=pretrained, **kwargs)

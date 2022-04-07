@@ -1,4 +1,6 @@
-from select import select
+from functools import partial
+from typing import Callable, Optional
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -13,13 +15,27 @@ __all__ = [
 
 # torchvision.ops.misc.ConvNormActivation initializes weights differently
 class ConvBnAct(nn.Sequential):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, act_fn=nn.ReLU):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int=3,
+        stride: int=1,
+        padding: int=1,
+        dilation: int=1,
+        groups: int=1,
+        bias: Optional[bool]=None,
+        norm_layer: Optional[Callable[..., nn.Module]]=nn.BatchNorm2d,
+        act_fn: Optional[Callable[..., nn.Module]]=partial(nn.ReLU, inplace=True)
+    ):
         super().__init__()
-        # support other types of conv also? then how to handle initialization?
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=False)
-        self.bn = nn.BatchNorm2d(out_channels)
+        if bias is None:
+            bias = norm_layer is None
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=bias)
+        if norm_layer is not None:
+            self.bn = norm_layer(out_channels)
         if act_fn is not None:
-            self.act = act_fn(inplace=True)        
+            self.act = act_fn()
             nn.init.kaiming_normal_(self.conv.weight, a=getattr(self.act, "negative_slop", 0), mode="fan_out")
 
 

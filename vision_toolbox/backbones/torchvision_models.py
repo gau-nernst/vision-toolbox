@@ -28,17 +28,14 @@ __all__ = [
 
 
 class _ExtractorBackbone(BaseBackbone):
-    def __init__(self, backbone, node_names, num_returns=4):
+    def __init__(self, backbone, node_names):
         super().__init__()
-        self.feat_extractor = create_feature_extractor(backbone, node_names[-num_returns:])
-        self.feat_extractor.eval()
+        self.feat_extractor = create_feature_extractor(backbone, node_names)
         with torch.no_grad():
-            out_channels = [x.shape[1] for x in self.feat_extractor(torch.rand(1,3,224,224)).values()]
-        
-        self.out_channels = tuple(out_channels)
+            self.out_channels = tuple(x.shape[1] for x in self.feat_extractor(torch.rand(1,3,224,224)).values())
         self.stride = 32
 
-    def forward_features(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def get_feature_maps(self, x: torch.Tensor) -> List[torch.Tensor]:
         return list(self.feat_extractor(x).values())
 
 

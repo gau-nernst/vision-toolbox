@@ -164,11 +164,11 @@ class PatchConvNet(BaseBackbone):
         self.stem = nn.Sequential(
             nn.Conv2d(3, embed_dim // 8, **kwargs),
             nn.GELU(),
-            nn.Conv2d(embed_dim//8, embed_dim // 4, **kwargs),
+            nn.Conv2d(embed_dim // 8, embed_dim // 4, **kwargs),
             nn.GELU(),
-            nn.Conv2d(embed_dim//4, embed_dim // 2, **kwargs),
+            nn.Conv2d(embed_dim // 4, embed_dim // 2, **kwargs),
             nn.GELU(),
-            nn.Conv2d(embed_dim//2, embed_dim, **kwargs),
+            nn.Conv2d(embed_dim // 2, embed_dim, **kwargs),
         )
 
         kwargs = dict(drop_path=drop_path, layer_scale_init=layer_scale_init)
@@ -185,7 +185,7 @@ class PatchConvNet(BaseBackbone):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    def forward_features(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor):
         out = self.stem(x)
 
         if self.norm_type == 'ln':
@@ -200,9 +200,6 @@ class PatchConvNet(BaseBackbone):
         
         out = self.pool(out)
         return out
-
-    def forward(self, x: torch.Tensor):
-        return self.forward_features(x)
 
 
 def patchconvnet_s60(pretrained=False, **kwargs): return PatchConvNet.from_config(configs['PatchConvNet-S60'], pretrained=pretrained, **kwargs)
