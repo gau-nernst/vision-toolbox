@@ -131,6 +131,16 @@ For reference, official Darknet models (Sources: [[pjreddie's website]](https://
 - These models use 256x256 image, thus their FLOPS are slightly higher
 - The 1000-class classification head is probaby included in their Parameters and FLOPS count, resulting in slightly higher numbers.
 
+#### Convert YOLOv5 backbone weights to use with [Ultralytics' repo](https://github.com/ultralytics/yolov5) (WIP)
+
+```bash
+python scripts/convert_yolov5_weights.py {weights_from_this_repo.pth} {save_path.pth}
+```
+
+The weights will be renamed to be compatiable with [Ultralytics' repo](https://github.com/ultralytics/yolov5). Note that the converted `.pth` file only contains the renamed state dict, up to `model.8` (the backbone part, without the SPPF layer). You will need to modify their [train script](https://github.com/ultralytics/yolov5/blob/master/train.py#L123) to treat the loaded file as a state dict, instead of a dictionary with key `model` containing the model object.
+
+I haven't tested training a full YOLOv5 object detector with the converted weights, so this function is not guaranteed to work correctly.
+
 ### VoVNet
 
 Paper: [[VoVNetV1]](https://arxiv.org/abs/1904.09730) [[VoVNetV2]](https://arxiv.org/abs/1911.06667)
