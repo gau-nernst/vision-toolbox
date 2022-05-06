@@ -9,5 +9,5 @@ if __name__ == "__main__":
         ImageClassifier,
         ImageDataModule,
         save_config_overwrite=True,
-        save_config_filename="saved_config.yaml"
+        save_config_filename="saved_config.yaml",
     )
