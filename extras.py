@@ -25,9 +25,9 @@ class RandomMixup(nn.Module):
             target = target.clone()
 
         if target.ndim == 1:
-            target = F.one_hot(
-                target, num_classes=self.num_classes
-            ).to(dtype=batch.dtype)
+            target = F.one_hot(target, num_classes=self.num_classes).to(
+                dtype=batch.dtype
+            )
 
         if torch.rand(1).item() >= self.p:
             return batch, target
@@ -63,9 +63,9 @@ class RandomCutmix(nn.Module):
             target = target.clone()
 
         if target.ndim == 1:
-            target = F.one_hot(
-                target, num_classes=self.num_classes
-            ).to(dtype=batch.dtype)
+            target = F.one_hot(target, num_classes=self.num_classes).to(
+                dtype=batch.dtype
+            )
 
         if torch.rand(1).item() >= self.p:
             return batch, target

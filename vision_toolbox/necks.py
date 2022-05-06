@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from .components import ConvBnAct, SeparableConv2d
 
 
-__all__ = ["BaseNeck", "FPN", "PAN", "BiFPN"]
+__all__ = ["FPN", "PAN", "BiFPN"]
 
 
 # support torchscript
@@ -42,18 +42,11 @@ _aggregate_functions = {
 }
 
 
-class BaseNeck(nn.Module, metaclass=ABCMeta):
-
-    @abstractmethod
-    def fuse_feature_maps(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
-        pass
-
-
 # https://arxiv.org/abs/1612.03144
-class FPN(BaseNeck):
+class FPN(nn.Module):
     def __init__(
         self,
-        in_channels: Iterable[int],
+        in_channels_list: Iterable[int],
         out_channels: int = 256,
         fuse_fn: str = "sum",
         block: Callable[[int, int], nn.Module] = ConvBnAct,
@@ -70,7 +63,7 @@ class FPN(BaseNeck):
                 nn.Conv2d(in_c, out_channels, kernel_size=1)
                 if in_c != out_channels
                 else nn.Identity()
-                for in_c in in_channels
+                for in_c in in_channels_list
             ]
         )
         self.upsample = nn.Upsample(
@@ -78,23 +71,23 @@ class FPN(BaseNeck):
         )
         in_c = out_channels if fuse_fn == "sum" else out_channels * 2
         self.output_convs = nn.ModuleList(
-            [block(in_c, out_channels) for _ in range(len(in_channels) - 1)]
+            [block(in_c, out_channels) for _ in range(len(in_channels_list) - 1)]
         )
 
     def _fuse_top_down(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
-        for i in range(len(x) - 2, -1, -1):  # 2, 1, 0
-            x[i] = self.fuse(x[i], self.upsample(x[i + 1]))
-            x[i] = self.output_convs[i](x[i])
+        for i, output_conv in enumerate(self.output_convs):
+            x[-2 - i] = self.fuse([x[-2 - i], self.upsample(x[-1 - i])])  # 2, 1, 0
+            x[-2 - i] = output_conv(x[-2 - i])
         return x
 
     def _fuse_bottom_up(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
-        for i in range(len(x) - 1):  # 0, 1, 2
-            x[i + 1] = self.fuse(x[i + 1], self.upsample(x[i]))
-            x[i + 1] = self.output_convs[i](x[i + 1])
+        for i, output_conv in enumerate(self.output_convs):
+            x[i + 1] = self.fuse([x[i + 1], self.upsample(x[i])])  # 1, 2, 3
+            x[i + 1] = output_conv(x[i + 1])
         return x
 
-    # input feature maps are ordered from bottom to top
-    def fuse_feature_maps(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    # input feature maps are ordered from bottom (largest) to top (smallest)
+    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
         assert len(x) == len(self.lateral_convs)
         outputs = [l_conv(x[i]) for i, l_conv in enumerate(self.lateral_convs)]
         if self.top_down:
@@ -103,10 +96,10 @@ class FPN(BaseNeck):
 
 
 # https://arxiv.org/abs/1803.01534
-class PAN(BaseNeck):
+class PAN(nn.Module):
     def __init__(
         self,
-        in_channels: Iterable[int],
+        in_channels_list: Iterable[int],
         out_channels: int = 256,
         fuse_fn: str = "sum",
         block: Callable[[int, int], nn.Module] = ConvBnAct,
@@ -114,21 +107,21 @@ class PAN(BaseNeck):
     ):
         super().__init__()
         self.top_down = FPN(
-            in_channels,
+            in_channels_list,
             out_channels,
             fuse_fn=fuse_fn,
             block=block,
             interpolation_mode=interpolation_mode,
         )
         self.bottom_up = FPN(
-            [out_channels] * len(in_channels),
+            [out_channels] * len(in_channels_list),
             out_channels,
             fuse_fn=fuse_fn,
             block=block,
             interpolation_mode=interpolation_mode,
         )
 
-    def fuse_feature_maps(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
         outputs = self.top_down(x)
         outputs = self.bottom_up(outputs)
         return outputs
@@ -136,10 +129,10 @@ class PAN(BaseNeck):
 
 # https://arxiv.org/pdf/1911.09070.pdf
 # https://github.com/google/automl/blob/master/efficientdet/efficientdet_arch.py
-class BiFPN(BaseNeck):
+class BiFPN(nn.Module):
     def __init__(
         self,
-        in_channels: Iterable[int],
+        in_channels_list: Iterable[int],
         out_channels: int = 64,
         num_layers: int = 1,
         block: Callable[[int, int], nn.Module] = SeparableConv2d,
@@ -149,12 +142,12 @@ class BiFPN(BaseNeck):
         super().__init__()
         self.out_channels = out_channels
         self.laterals = nn.ModuleList(
-            [nn.Conv2d(in_c, out_channels, kernel_size=1) for in_c in in_channels]
+            [nn.Conv2d(in_c, out_channels, kernel_size=1) for in_c in in_channels_list]
         )
-        self.layers = nn.Sequential(
-            *[
+        self.layers = nn.ModuleList(
+            [
                 BiFPNLayer(
-                    len(in_channels),
+                    len(in_channels_list),
                     out_channels,
                     block=block,
                     interpolation_mode=interpolation_mode,
@@ -164,9 +157,11 @@ class BiFPN(BaseNeck):
             ]
         )
 
-    def fuse_feature_maps(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+        assert len(x) == len(self.laterals)
         outputs = [l_conv(x[i]) for i, l_conv in enumerate(self.laterals)]
-        outputs = self.layers(outputs)
+        for layer in self.layers:
+            outputs = layer(outputs)
         return outputs
 
 
@@ -193,31 +188,24 @@ class BiFPNLayer(nn.Module):
                 for _ in range(num_levels - 2)
             ]
         )
-        self.out_fuses.append(WeightedFeatureFusion(num_channels, block=block, eps=eps))
+        self.last_out_fuse = WeightedFeatureFusion(num_channels, block=block, eps=eps)
 
         self.upsample = nn.Upsample(scale_factor=2.0, mode=interpolation_mode)
         self.downsample = nn.Upsample(scale_factor=0.5, mode=interpolation_mode)
 
     def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
-        # top-down
-        tds = [None] * self.num_levels
-        tds[-1] = x[-1]
-        for i in range(self.num_levels - 2, -1, -1):
-            tds[i] = self.td_fuses[i](
-                [x[i], self.upsample(tds[i + 1])]
-            )  # P6td = conv(P6in + resize(P7td))
+        # top-down, P6td = conv(P6in + resize(P7td))
+        tds = list(x)  # make a copy
+        for i, td_fuse in enumerate(self.td_fuses):
+            tds[-2 - i] = td_fuse([x[-2 - i], self.upsample(tds[-1 - i])])
 
-        # bottom-up
-        outs = [None] * self.num_levels
-        outs[0] = tds[0]
-        for i in range(self.num_levels - 2):
-            outs[i + 1] = self.out_fuses[i](
-                [x[i + 1], tds[i + 1], self.downsample(tds[i])]
-            )  # P4in + P4td + resize(P3td)
-        outs[-1] = self.out_fuses[-1](
-            [x[-1], self.downsample(tds[-2])]
-        )  # P7in + resize(P6td)
+        # bottom-up, P4in + P4td + resize(P3td)
+        outs = list(tds)
+        for i, out_fuse in enumerate(self.out_fuses):
+            outs[i + 1] = out_fuse([x[i + 1], tds[i + 1], self.downsample(tds[i])])
 
+        # # P7in + resize(P6td)
+        outs[-1] = self.last_out_fuse([x[-1], self.downsample(tds[-2])])
         return outs
 
 
@@ -237,6 +225,6 @@ class WeightedFeatureFusion(nn.Module):
     def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
         weights = F.relu(self.weights)
         out = 0
-        for i in range(weights):
+        for i in range(weights.shape[0]):
             out += x[i] * weights[i]
         return self.conv(out / (weights.sum() + self.eps))
