@@ -110,7 +110,7 @@ class DarknetYolov5(BaseBackbone):
         stage_fn: Callable[..., nn.Module] = CSPDarknetStage,
     ):
         super().__init__()
-        self.out_channels_list = tuple(num_channels_list)
+        self.out_channels_list = (stem_channels,) + tuple(num_channels_list)
         self.stride = 32
 
         self.stem = ConvBnAct(3, stem_channels, kernel_size=6, stride=2, padding=2)

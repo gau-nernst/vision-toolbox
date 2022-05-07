@@ -1,4 +1,5 @@
-from typing import Tuple, Dict, List
+from copy import deepcopy
+from typing import Dict, List
 from abc import ABCMeta, abstractmethod
 import warnings
 
@@ -18,6 +19,7 @@ class BaseBackbone(nn.Module, metaclass=ABCMeta):
 
     @classmethod
     def from_config(cls, config: Dict, pretrained: bool = False, **kwargs):
+        config = deepcopy(config)
         weights = config.pop("weights", None)
         model = cls(**config, **kwargs)
         if pretrained:
@@ -25,8 +27,6 @@ class BaseBackbone(nn.Module, metaclass=ABCMeta):
                 state_dict = load_state_dict_from_url(weights)
                 model.load_state_dict(state_dict)
             else:
-                warnings.warn(
-                    "No pre-trained weights are available. Skip loading pre-trained weights"
-                )
-
+                msg = "No pre-trained weights are available. Skip loading pre-trained weights"
+                warnings.warn(msg)
         return model
