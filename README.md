@@ -26,8 +26,14 @@ from vision_toolbox import backbones
 
 model = backbones.cspdarknet53(pretrained=True)
 model(inputs)                       # last feature map, stride 32
-model.forward_features(inputs)      # list of 4 feature maps, stride 4, 8, 16, 32
-model.get_out_channels()            # channels of output feature maps
+model.get_feature_maps(inputs)      # list of 5 feature maps, stride 2, 4, 8, 16, 32
+model.out_channels_list             # tuple of output channels, corresponding to each feature map
+```
+
+For object detection, usually only the last 4 feature maps are used. It is the responsibility of the user to select the last 4 feature maps from `.get_feature_maps()`
+
+```python
+outputs = model.get_feature_maps(inputs)[-4:]   # last 4 feature maps
 ```
 
 ## Backbones
