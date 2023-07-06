@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from torchvision.models import mobilenet, resnet
 
+
 try:
     from torchvision.models import efficientnet, regnet
     from torchvision.models.feature_extraction import create_feature_extractor
@@ -13,6 +14,7 @@ except ImportError:
     regnet = efficientnet = create_feature_extractor = None
 
 from .base import BaseBackbone
+
 
 __all__ = [
     "ResNetExtractor",
@@ -61,10 +63,7 @@ class _ExtractorBackbone(BaseBackbone):
         super().__init__()
         self.feat_extractor = create_feature_extractor(backbone, node_names)
         with torch.no_grad():
-            self.out_channels_list = tuple(
-                x.shape[1]
-                for x in self.feat_extractor(torch.rand(1, 3, 224, 224)).values()
-            )
+            self.out_channels_list = tuple(x.shape[1] for x in self.feat_extractor(torch.rand(1, 3, 224, 224)).values())
         self.stride = 32
 
     def get_feature_maps(self, x: torch.Tensor) -> List[torch.Tensor]:
@@ -91,12 +90,8 @@ class MobileNetExtractor(_ExtractorBackbone):
         block_name = "conv" if name == "mobilenet_v2" else "block"
 
         # take output at expansion 1x1 conv
-        stage_indices = [
-            i for i, b in enumerate(backbone.features) if getattr(b, "_is_cn", False)
-        ]
-        node_names = [f"features.{i}.{block_name}.0" for i in stage_indices] + [
-            f"features.{len(backbone.features)-1}"
-        ]
+        stage_indices = [i for i, b in enumerate(backbone.features) if getattr(b, "_is_cn", False)]
+        node_names = [f"features.{i}.{block_name}.0" for i in stage_indices] + [f"features.{len(backbone.features)-1}"]
         super().__init__(backbone, node_names)
 
 
@@ -106,9 +101,7 @@ class EfficientNetExtractor(_ExtractorBackbone):
 
         # take output at expansion 1x1 conv
         stage_indices = [2, 3, 4, 6]
-        node_names = [f"features.{i}.0.block.0" for i in stage_indices] + [
-            f"features.{len(backbone.features)-1}"
-        ]
+        node_names = [f"features.{i}.0.block.0" for i in stage_indices] + [f"features.{len(backbone.features)-1}"]
         super().__init__(backbone, node_names)
 
 

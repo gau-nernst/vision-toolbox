@@ -1,15 +1,13 @@
-import random
+import argparse
 import math
 import os
-import argparse
+import random
 
 import webdataset as wds
 from torchvision.datasets import ImageFolder
 
 
-def image_folder_to_webdataset(
-    data_dir, save_dir, name, shuffle=False, shard_size=1e9, max_shards=1e5
-):
+def image_folder_to_webdataset(data_dir, save_dir, name, shuffle=False, shard_size=1e9, max_shards=1e5):
     os.makedirs(save_dir, exist_ok=True)
 
     ds = ImageFolder(data_dir)
@@ -42,6 +40,4 @@ if __name__ == "__main__":
     parser.add_argument("--shuffle", type=bool, default=False)
 
     args = parser.parse_args()
-    image_folder_to_webdataset(
-        args.data_dir, args.save_dir, args.name, shuffle=args.shuffle
-    )
+    image_folder_to_webdataset(args.data_dir, args.save_dir, args.name, shuffle=args.shuffle)

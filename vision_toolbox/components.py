@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch import nn
 from torchvision.ops import DeformConv2d
 
+
 __all__ = ["ConvBnAct", "SeparableConv2d", "DeformableConv2d", "ESEBlock", "SPPBlock"]
 
 
@@ -71,9 +72,7 @@ class SeparableConv2d(nn.Sequential):
             groups=in_channels,
             act_fn=act_fn,
         )
-        self.pw = ConvBnAct(
-            in_channels, out_channels, kernel_size=1, padding=0, act_fn=act_fn
-        )
+        self.pw = ConvBnAct(in_channels, out_channels, kernel_size=1, padding=0, act_fn=act_fn)
 
 
 # https://arxiv.org/abs/1911.06667
@@ -86,9 +85,7 @@ class ESEBlock(nn.Module):
         # author's code uses Hardsigmoid, although it is not mentioned in the paper
         # https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py
         super().__init__()
-        self.linear = nn.Conv2d(
-            num_channels, num_channels, 1
-        )  # use conv so don't need to flatten output
+        self.linear = nn.Conv2d(num_channels, num_channels, 1)  # use conv so don't need to flatten output
         self.gate = gate_fn()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -118,11 +115,7 @@ class DeformableConv2d(nn.Module):
         # https://github.com/msracver/Deformable-ConvNets/blob/master/DCNv2_op/example_symbol.py    x2 after sigmoid
         # https://github.com/open-mmlab/mmcv/blob/master/mmcv/ops/modulated_deform_conv.py          don't x2 after sigmoid
         super().__init__()
-        num_locations = (
-            kernel_size ** 2
-            if isinstance(kernel_size, int)
-            else kernel_size[0] * kernel_size[1]
-        )
+        num_locations = kernel_size**2 if isinstance(kernel_size, int) else kernel_size[0] * kernel_size[1]
         # include groups here also?
         self.conv_offset = conv_fn(
             in_channels,

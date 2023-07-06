@@ -1,18 +1,19 @@
 from functools import partial
 from typing import Union
 
-import torch
-from torch import nn
-import torch.nn.functional as F
-from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
-import torchvision
-from torchvision.ops import StochasticDepth
-import torchvision.transforms as T
 import pytorch_lightning as pl
 import timm.optim
+import torch
+import torch.nn.functional as F
+import torchvision
+import torchvision.transforms as T
+from torch import nn
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
+from torchvision.ops import StochasticDepth
 
-from vision_toolbox import backbones
 from extras import RandomCutMixMixUp
+from vision_toolbox import backbones
+
 
 # https://github.com/pytorch/vision/blob/main/references/classification/train.py
 # https://pytorch.org/blog/how-to-train-state-of-the-art-models-using-torchvision-latest-primitives/
@@ -54,9 +55,7 @@ class ImageClassifier(pl.LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
-        backbone = (
-            backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
-        )
+        backbone = backbones.__dict__[backbone]() if isinstance(backbone, str) else backbone
         layers = [backbone]
         if include_pool:
             layers.append(nn.AdaptiveAvgPool2d((1, 1)))
@@ -65,9 +64,7 @@ class ImageClassifier(pl.LightningModule):
         self.model = nn.Sequential(*layers)
 
         self.mixup_cutmix = (
-            RandomCutMixMixUp(num_classes, cutmix_alpha, mixup_alpha)
-            if cutmix_alpha > 0 and mixup_alpha > 0
-            else None
+            RandomCutMixMixUp(num_classes, cutmix_alpha, mixup_alpha) if cutmix_alpha > 0 and mixup_alpha > 0 else None
         )
         if drop_out is not None:
             for m in self.model.modules():
@@ -92,9 +89,7 @@ class ImageClassifier(pl.LightningModule):
             images = images.to(memory_format=torch.channels_last)
 
         logits = self.model(images)
-        loss = F.cross_entropy(
-            logits, labels, label_smoothing=self.hparams.label_smoothing
-        )
+        loss = F.cross_entropy(logits, labels, label_smoothing=self.hparams.label_smoothing)
         self.log("train/loss", loss)
 
         return loss
@@ -129,9 +124,7 @@ class ImageClassifier(pl.LightningModule):
         other_params = []
         for module in self.modules():
             if next(module.children(), None):
-                other_params.extend(
-                    p for p in module.parameters(recurse=False) if p.requires_grad
-                )
+                other_params.extend(p for p in module.parameters(recurse=False) if p.requires_grad)
 
             elif isinstance(module, norm_classes):
                 norm_params.extend(p for p in module.parameters() if p.requires_grad)
@@ -159,18 +152,14 @@ class ImageClassifier(pl.LightningModule):
             },
             {"params": other_params, "weight_decay": wd},
         ]
-        parameters = [
-            x for x in parameters if x["params"]
-        ]  # remove empty params groups
+        parameters = [x for x in parameters if x["params"]]  # remove empty params groups
 
         # build optimizer
         optimizer_name = self.hparams.optimizer
         lr = self.hparams.lr
         momentum = self.hparams.momentum
         if optimizer_name in ("SGD", "RMSprop"):
-            optimizer_cls = partial(
-                getattr(torch.optim, optimizer_name), momentum=momentum
-            )
+            optimizer_cls = partial(getattr(torch.optim, optimizer_name), momentum=momentum)
         elif hasattr(torch.optim, optimizer_name):
             optimizer_cls = getattr(optimizer_name)
         elif hasattr(timm.optim, optimizer_name):
@@ -189,9 +178,7 @@ class ImageClassifier(pl.LightningModule):
             eta_min=lr * decay_factor,
         )
         if warmup_epochs > 0:
-            warmup_scheduler = LinearLR(
-                optimizer, start_factor=warmup_factor, total_iters=warmup_epochs
-            )
+            warmup_scheduler = LinearLR(optimizer, start_factor=warmup_factor, total_iters=warmup_epochs)
             lr_scheduler = SequentialLR(
                 optimizer,
                 schedulers=[warmup_scheduler, lr_scheduler],
