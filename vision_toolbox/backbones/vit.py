@@ -29,11 +29,11 @@ class ViT(nn.Module):
         mlp_dim: int | None = None,
         cls_token: bool = True,
         dropout: float = 0.0,
-        norm_eps: float = 1e-6,  # follow jax
+        norm_eps: float = 1e-6,
     ):
         super().__init__()
         self.patch_embed = nn.Conv2d(3, d_model, patch_size, patch_size)
-        self.cls_token = nn.Parameter(torch.empty(1, 1, d_model)) if cls_token else None
+        self.cls_token = nn.Parameter(torch.zero_(1, 1, d_model)) if cls_token else None
 
         if isinstance(img_size, int):
             img_size = [img_size, img_size]
@@ -41,18 +41,11 @@ class ViT(nn.Module):
         if cls_token:
             pe_size += 1
         self.pe = nn.Parameter(torch.empty(pe_size, 1, d_model))
+        nn.init.normal_(self.pe, 0, 0.02)
 
         mlp_dim = mlp_dim or d_model * 4
         layer = nn.TransformerEncoderLayer(d_model, n_heads, mlp_dim, dropout, "gelu", norm_eps, False, True)
         self.encoder = nn.TransformerEncoder(layer, n_layers, nn.LayerNorm(d_model, norm_eps))
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        # TODO: init self.patch_embed and self.encoder
-        if self.cls_token is not None:
-            nn.init.zeros_(self.cls_token)
-        nn.init.normal_(self.pe, 0, 0.02)
 
     def forward(self, imgs: Tensor) -> Tensor:
         out = self.patch_embed(imgs)
