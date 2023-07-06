@@ -36,13 +36,13 @@ _slim = dict(
 )
 configs = {
     # VoVNetV1
-    "vovnet-27-slim": dict(
+    "vovnet-27-slim": {
         **_base,
         **_slim,
-        num_blocks_list=(1, 1, 1, 1),
-        ese=False,
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet27_slim-79617b9c.pth",
-    ),
+        "num_blocks_list": (1, 1, 1, 1),
+        "ese": False,
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet27_slim-79617b9c.pth",
+    },
     "vovnet-39": dict(
         **_base,
         num_blocks_list=(1, 1, 2, 2),
@@ -56,19 +56,19 @@ configs = {
         weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57-9929476e.pth",
     ),
     # VoVNetV2
-    "vovnet-19-slim-ese": dict(
+    "vovnet-19-slim-ese": {
         **_base,
         **_slim,
-        num_layers_list=(3, 3, 3, 3),
-        num_blocks_list=(1, 1, 1, 1),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_slim_ese-446e2ae9.pth",
-    ),
-    "vovnet-19-ese": dict(
+        "num_layers_list": (3, 3, 3, 3),
+        "num_blocks_list": (1, 1, 1, 1),
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_slim_ese-446e2ae9.pth",
+    },
+    "vovnet-19-ese": {
         **_base,
-        num_layers_list=(3, 3, 3, 3),
-        num_blocks_list=(1, 1, 1, 1),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_ese-4410fc5f.pth",
-    ),
+        "num_layers_list": (3, 3, 3, 3),
+        "num_blocks_list": (1, 1, 1, 1),
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_ese-4410fc5f.pth",
+    },
     "vovnet-39-ese": dict(
         **_base,
         num_blocks_list=(1, 1, 2, 2),
