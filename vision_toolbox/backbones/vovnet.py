@@ -3,11 +3,12 @@
 # VoVNetV2: https://arxiv.org/abs/1911.06667 (CenterMask)
 
 from typing import Iterable, Tuple
+
 import torch
 from torch import nn
 
-from .base import BaseBackbone
 from ..components import ConvBnAct, ESEBlock
+from .base import BaseBackbone
 
 
 __all__ = [
@@ -98,15 +99,10 @@ class OSABlock(nn.Module):
     ):
         super().__init__()
         self.convs = nn.ModuleList(
-            [
-                ConvBnAct(in_channels if i == 0 else mid_channels, mid_channels)
-                for i in range(num_layers)
-            ]
+            [ConvBnAct(in_channels if i == 0 else mid_channels, mid_channels) for i in range(num_layers)]
         )
         concat_channels = in_channels + mid_channels * num_layers
-        self.out_conv = ConvBnAct(
-            concat_channels, out_channels, kernel_size=1, padding=0
-        )
+        self.out_conv = ConvBnAct(concat_channels, out_channels, kernel_size=1, padding=0)
 
         self.ese = ESEBlock(out_channels) if ese else None
         self.residual = residual and (in_channels == out_channels)
@@ -153,9 +149,7 @@ class VoVNet(BaseBackbone):
 
         self.stages = nn.ModuleList()
         in_c = stem_channels
-        for n, stage_c, n_l, out_c in zip(
-            num_blocks_list, stage_channels_list, num_layers_list, out_channels_list
-        ):
+        for n, stage_c, n_l, out_c in zip(num_blocks_list, stage_channels_list, num_layers_list, out_channels_list):
             stage = nn.Sequential()
             stage.add_module("max_pool", nn.MaxPool2d(3, 2, padding=1))
             for i in range(n):
@@ -174,9 +168,7 @@ class VoVNet(BaseBackbone):
 
 
 def vovnet27_slim(pretrained=False, **kwargs):
-    return VoVNet.from_config(
-        configs["vovnet-27-slim"], pretrained=pretrained, **kwargs
-    )
+    return VoVNet.from_config(configs["vovnet-27-slim"], pretrained=pretrained, **kwargs)
 
 
 def vovnet39(pretrained=False, **kwargs):
@@ -188,9 +180,7 @@ def vovnet57(pretrained=False, **kwargs):
 
 
 def vovnet19_slim_ese(pretrained=False, **kwargs):
-    return VoVNet.from_config(
-        configs["vovnet-19-slim-ese"], pretrained=pretrained, **kwargs
-    )
+    return VoVNet.from_config(configs["vovnet-19-slim-ese"], pretrained=pretrained, **kwargs)
 
 
 def vovnet19_ese(pretrained=False, **kwargs):

@@ -11,6 +11,7 @@ from torch import nn
 from ..components import ConvBnAct
 from .base import BaseBackbone
 
+
 __all__ = [
     "Darknet",
     "DarknetYolov5",
@@ -54,9 +55,7 @@ class CSPDarknetStage(nn.Module):
         half_channels = out_channels // 2
         self.conv1 = ConvBnAct(out_channels, half_channels, kernel_size=1, padding=0)
         self.conv2 = ConvBnAct(out_channels, half_channels, kernel_size=1, padding=0)
-        self.blocks = nn.Sequential(
-            *[DarknetBlock(half_channels, expansion=1) for _ in range(n)]
-        )
+        self.blocks = nn.Sequential(*[DarknetBlock(half_channels, expansion=1) for _ in range(n)])
         self.out_conv = ConvBnAct(out_channels, out_channels, kernel_size=1, padding=0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -87,9 +86,7 @@ class Darknet(BaseBackbone):
         self.stages = nn.ModuleList()
         in_c = stem_channels
         for n, c in zip(num_blocks_list, num_channels_list):
-            self.stages.append(
-                stage_fn(n, in_c, c) if n > 0 else ConvBnAct(in_c, c, stride=2)
-            )
+            self.stages.append(stage_fn(n, in_c, c) if n > 0 else ConvBnAct(in_c, c, stride=2))
             in_c = c
 
     def get_feature_maps(self, x):
@@ -155,27 +152,19 @@ configs = {
     "darknet-yolov5n": {
         "stem_channels": int(_darknet_yolov5_stem_channels / 4),
         "num_blocks_list": tuple(int(x / 3) for x in _darknet_yolov5_num_blocks_list),
-        "num_channels_list": tuple(
-            int(x / 4) for x in _darknet_yolov5_num_channels_list
-        ),
+        "num_channels_list": tuple(int(x / 4) for x in _darknet_yolov5_num_channels_list),
         "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5n-a9335553.pth",
     },
     "darknet-yolov5s": {
         "stem_channels": int(_darknet_yolov5_stem_channels / 2),
         "num_blocks_list": tuple(int(x / 3) for x in _darknet_yolov5_num_blocks_list),
-        "num_channels_list": tuple(
-            int(x / 2) for x in _darknet_yolov5_num_channels_list
-        ),
+        "num_channels_list": tuple(int(x / 2) for x in _darknet_yolov5_num_channels_list),
         "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5s-e8dba89f.pth",
     },
     "darknet-yolov5m": {
         "stem_channels": int(_darknet_yolov5_stem_channels * 3 / 4),
-        "num_blocks_list": tuple(
-            int(x * 2 / 3) for x in _darknet_yolov5_num_blocks_list
-        ),
-        "num_channels_list": tuple(
-            int(x * 3 / 4) for x in _darknet_yolov5_num_channels_list
-        ),
+        "num_blocks_list": tuple(int(x * 2 / 3) for x in _darknet_yolov5_num_blocks_list),
+        "num_channels_list": tuple(int(x * 3 / 4) for x in _darknet_yolov5_num_channels_list),
         "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5m-a1eb31bd.pth",
     },
     "darknet-yolov5l": {
@@ -186,12 +175,8 @@ configs = {
     },
     "darknet-yolov5x": {
         "stem_channels": int(_darknet_yolov5_stem_channels * 5 / 4),
-        "num_blocks_list": tuple(
-            int(x * 4 / 3) for x in _darknet_yolov5_num_blocks_list
-        ),
-        "num_channels_list": tuple(
-            int(x * 5 / 4) for x in _darknet_yolov5_num_channels_list
-        ),
+        "num_blocks_list": tuple(int(x * 4 / 3) for x in _darknet_yolov5_num_blocks_list),
+        "num_channels_list": tuple(int(x * 5 / 4) for x in _darknet_yolov5_num_channels_list),
         "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5x-bf388a43.pth",
     },
 }
@@ -206,36 +191,24 @@ def darknet53(pretrained=False, **kwargs):
 
 
 def cspdarknet53(pretrained=False, **kwargs):
-    return Darknet.from_config(
-        configs["cspdarknet-53"], pretrained=pretrained, **kwargs
-    )
+    return Darknet.from_config(configs["cspdarknet-53"], pretrained=pretrained, **kwargs)
 
 
 def darknet_yolov5n(pretrained=False, **kwargs):
-    return DarknetYolov5.from_config(
-        configs["darknet-yolov5n"], pretrained=pretrained, **kwargs
-    )
+    return DarknetYolov5.from_config(configs["darknet-yolov5n"], pretrained=pretrained, **kwargs)
 
 
 def darknet_yolov5s(pretrained=False, **kwargs):
-    return DarknetYolov5.from_config(
-        configs["darknet-yolov5s"], pretrained=pretrained, **kwargs
-    )
+    return DarknetYolov5.from_config(configs["darknet-yolov5s"], pretrained=pretrained, **kwargs)
 
 
 def darknet_yolov5m(pretrained=False, **kwargs):
-    return DarknetYolov5.from_config(
-        configs["darknet-yolov5m"], pretrained=pretrained, **kwargs
-    )
+    return DarknetYolov5.from_config(configs["darknet-yolov5m"], pretrained=pretrained, **kwargs)
 
 
 def darknet_yolov5l(pretrained=False, **kwargs):
-    return DarknetYolov5.from_config(
-        configs["darknet-yolov5l"], pretrained=pretrained, **kwargs
-    )
+    return DarknetYolov5.from_config(configs["darknet-yolov5l"], pretrained=pretrained, **kwargs)
 
 
 def darknet_yolov5x(pretrained=False, **kwargs):
-    return DarknetYolov5.from_config(
-        configs["darknet-yolov5x"], pretrained=pretrained, **kwargs
-    )
+    return DarknetYolov5.from_config(configs["darknet-yolov5x"], pretrained=pretrained, **kwargs)

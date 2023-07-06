@@ -2,8 +2,8 @@ from abc import ABCMeta, abstractmethod
 from typing import Callable, Iterable, List
 
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
 from .components import ConvBnAct, SeparableConv2d
 
@@ -60,19 +60,13 @@ class FPN(nn.Module):
 
         self.lateral_convs = nn.ModuleList(
             [
-                nn.Conv2d(in_c, out_channels, kernel_size=1)
-                if in_c != out_channels
-                else nn.Identity()
+                nn.Conv2d(in_c, out_channels, kernel_size=1) if in_c != out_channels else nn.Identity()
                 for in_c in in_channels_list
             ]
         )
-        self.upsample = nn.Upsample(
-            scale_factor=2.0 if top_down else 0.5, mode=interpolation_mode
-        )
+        self.upsample = nn.Upsample(scale_factor=2.0 if top_down else 0.5, mode=interpolation_mode)
         in_c = out_channels if fuse_fn == "sum" else out_channels * 2
-        self.output_convs = nn.ModuleList(
-            [block(in_c, out_channels) for _ in range(len(in_channels_list) - 1)]
-        )
+        self.output_convs = nn.ModuleList([block(in_c, out_channels) for _ in range(len(in_channels_list) - 1)])
 
     def _fuse_top_down(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
         for i, output_conv in enumerate(self.output_convs):
@@ -141,9 +135,7 @@ class BiFPN(nn.Module):
     ):
         super().__init__()
         self.out_channels = out_channels
-        self.laterals = nn.ModuleList(
-            [nn.Conv2d(in_c, out_channels, kernel_size=1) for in_c in in_channels_list]
-        )
+        self.laterals = nn.ModuleList([nn.Conv2d(in_c, out_channels, kernel_size=1) for in_c in in_channels_list])
         self.layers = nn.ModuleList(
             [
                 BiFPNLayer(
@@ -177,16 +169,10 @@ class BiFPNLayer(nn.Module):
         super().__init__()
         self.num_levels = num_levels
         self.td_fuses = nn.ModuleList(
-            [
-                WeightedFeatureFusion(num_channels, block=block, eps=eps)
-                for _ in range(num_levels - 1)
-            ]
+            [WeightedFeatureFusion(num_channels, block=block, eps=eps) for _ in range(num_levels - 1)]
         )
         self.out_fuses = nn.ModuleList(
-            [
-                WeightedFeatureFusion(num_channels, num_inputs=3, block=block, eps=eps)
-                for _ in range(num_levels - 2)
-            ]
+            [WeightedFeatureFusion(num_channels, num_inputs=3, block=block, eps=eps) for _ in range(num_levels - 2)]
         )
         self.last_out_fuse = WeightedFeatureFusion(num_channels, block=block, eps=eps)
 
