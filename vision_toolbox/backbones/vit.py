@@ -1,3 +1,5 @@
+# https://arxiv.org/abs/2010.11929
+# https://arxiv.org/abs/2106.10270
 # https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_vit.py
 
 from typing import Mapping
@@ -26,6 +28,8 @@ class ViT(nn.Module):
         img_size: int | tuple[int, int],
         mlp_dim: int | None = None,
         cls_token: bool = True,
+        dropout: float = 0.0,
+        norm_eps: float = 1e-6,  # follow jax
     ):
         super().__init__()
         self.patch_embed = nn.Conv2d(3, d_model, patch_size, patch_size)
@@ -36,18 +40,11 @@ class ViT(nn.Module):
         pe_size = (img_size[0] // patch_size) * (img_size[1] // patch_size)
         if cls_token:
             pe_size += 1
-        self.pe = nn.Parameter(torch.empty(1, pe_size, d_model))
+        self.pe = nn.Parameter(torch.empty(pe_size, 1, d_model))
 
         mlp_dim = mlp_dim or d_model * 4
-        layer = nn.TransformerEncoderLayer(
-            d_model,
-            n_heads,
-            mlp_dim,
-            activation="gelu",
-            batch_first=True,
-            norm_first=True,
-        )
-        self.encoder = nn.TransformerEncoder(layer, n_layers, nn.LayerNorm(d_model))
+        layer = nn.TransformerEncoderLayer(d_model, n_heads, mlp_dim, dropout, "gelu", norm_eps, False, True)
+        self.encoder = nn.TransformerEncoder(layer, n_layers, nn.LayerNorm(d_model, norm_eps))
 
         self.reset_parameters()
 
@@ -59,12 +56,12 @@ class ViT(nn.Module):
 
     def forward(self, imgs: Tensor) -> Tensor:
         out = self.patch_embed(imgs)
-        out = out.flatten(-2).transpose(-1, -2)  # (N, C, H, W) -> (N, H*W, C)
+        out = out.flatten(2).permute(2, 0, 1)  # (N, C, H, W) -> (H*W, N, C)
         if self.cls_token is not None:
-            out = torch.cat([self.cls_token.expand(out.shape[0], -1, -1), out], 1)
+            out = torch.cat([self.cls_token.expand(-1, out.shape[1], -1), out], 0)
         out = out + self.pe
         out = self.encoder(out)
-        out = out[:, 0] if self.cls_token is not None else out.mean(1)
+        out = out[0] if self.cls_token is not None else out.mean(0)
         return out
 
     @staticmethod
@@ -107,13 +104,13 @@ class ViT(nn.Module):
             b = torch.stack([_get(f"{jax_prefix}/{x}/bias") for x in ["query", "key", "value"]], 0)
             torch_weights[f"{torch_prefix}.in_proj_bias"] = b.flatten()
 
-            torch_weights[f"{torch_prefix}.out_proj.weight"] = _get(f"{jax_prefix}/out/kernel").flatten(0, 1)
+            torch_weights[f"{torch_prefix}.out_proj.weight"] = _get(f"{jax_prefix}/out/kernel").flatten(0, 1).T
             torch_weights[f"{torch_prefix}.out_proj.bias"] = _get(f"{jax_prefix}/out/bias")
 
         torch_weights["cls_token"] = _get("cls")
         torch_weights["patch_embed.weight"] = _get("embedding/kernel").permute(3, 2, 0, 1)
         torch_weights["patch_embed.bias"] = _get("embedding/bias")
-        torch_weights["pe"] = _get("Transformer/posembed_input/pos_embedding")
+        torch_weights["pe"] = _get("Transformer/posembed_input/pos_embedding").view(-1, 1, d_model)
 
         for idx in range(n_layers):
             jax_prefix = f"Transformer/encoderblock_{idx}"
@@ -127,4 +124,6 @@ class ViT(nn.Module):
 
         _convert_layer_norm("Transformer/encoder_norm", "encoder.norm")
 
-        return ViT(n_layers, d_model, n_heads, patch_size, img_size).load_state_dict(torch_weights)
+        model = ViT(n_layers, d_model, n_heads, patch_size, img_size)
+        model.load_state_dict(torch_weights)
+        return model
