@@ -1,13 +1,13 @@
-import os
+import hashlib
 import io
 import math
+import os
 import time
-import hashlib
 
 import torch
-from torch import nn
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
+from torch import nn
 
 
 # https://github.com/pytorch/vision/blob/main/references/classification/transforms.py
@@ -25,9 +25,7 @@ class RandomMixup(nn.Module):
             target = target.clone()
 
         if target.ndim == 1:
-            target = F.one_hot(target, num_classes=self.num_classes).to(
-                dtype=batch.dtype
-            )
+            target = F.one_hot(target, num_classes=self.num_classes).to(dtype=batch.dtype)
 
         if torch.rand(1).item() >= self.p:
             return batch, target
@@ -37,9 +35,7 @@ class RandomMixup(nn.Module):
         target_rolled = target.roll(1, 0)
 
         # Implemented as on mixup paper, page 3.
-        lambda_param = float(
-            torch._sample_dirichlet(torch.tensor([self.alpha, self.alpha]))[0]
-        )
+        lambda_param = float(torch._sample_dirichlet(torch.tensor([self.alpha, self.alpha]))[0])
         batch_rolled.mul_(1.0 - lambda_param)
         batch.mul_(lambda_param).add_(batch_rolled)
 
@@ -63,9 +59,7 @@ class RandomCutmix(nn.Module):
             target = target.clone()
 
         if target.ndim == 1:
-            target = F.one_hot(target, num_classes=self.num_classes).to(
-                dtype=batch.dtype
-            )
+            target = F.one_hot(target, num_classes=self.num_classes).to(dtype=batch.dtype)
 
         if torch.rand(1).item() >= self.p:
             return batch, target
@@ -75,9 +69,7 @@ class RandomCutmix(nn.Module):
         target_rolled = target.roll(1, 0)
 
         # Implemented as on cutmix paper, page 12 (with minor corrections on typos).
-        lambda_param = float(
-            torch._sample_dirichlet(torch.tensor([self.alpha, self.alpha]))[0]
-        )
+        lambda_param = float(torch._sample_dirichlet(torch.tensor([self.alpha, self.alpha]))[0])
         W, H = TF.get_image_size(batch)
 
         r_x = torch.randint(W, (1,))
@@ -107,16 +99,8 @@ class RandomCutMixMixUp(nn.Module):
         if cutmix_alpha == 0 and mixup_alpha == 0:
             raise ValueError
 
-        self.cutmix = (
-            RandomCutmix(num_classes, p=1, alpha=cutmix_alpha, inplace=inplace)
-            if cutmix_alpha > 0
-            else None
-        )
-        self.mixup = (
-            RandomMixup(num_classes, p=1, alpha=mixup_alpha, inplace=inplace)
-            if mixup_alpha > 0
-            else None
-        )
+        self.cutmix = RandomCutmix(num_classes, p=1, alpha=cutmix_alpha, inplace=inplace) if cutmix_alpha > 0 else None
+        self.mixup = RandomMixup(num_classes, p=1, alpha=mixup_alpha, inplace=inplace) if mixup_alpha > 0 else None
 
     def forward(self, batch, target):
         if self.cutmix is None or torch.rand(1).item() >= 0.5:
@@ -132,11 +116,7 @@ def extract_backbone_weights(lightning_ckpt_path, save_name, save_dir=None):
     ckpt = torch.load(lightning_ckpt_path, map_location="cpu")
     state_dict = ckpt["state_dict"]
     backbone_token = "model.0."
-    backbone_weights = {
-        k[len(backbone_token) :]: v
-        for k, v in state_dict.items()
-        if k.startswith(backbone_token)
-    }
+    backbone_weights = {k[len(backbone_token) :]: v for k, v in state_dict.items() if k.startswith(backbone_token)}
 
     buffer = io.BytesIO()
     torch.save(backbone_weights, buffer)
@@ -181,9 +161,7 @@ def profile(module: nn.Module, input: torch.Tensor = None, n: int = 10, device="
     tf *= 1000 / n  # convert to ms and take average
     tb *= 1000 / n
 
-    mem = (
-        torch.cuda.memory_reserved(device) / 1e9 if torch.cuda.is_available() else 0
-    )  # GB
+    mem = torch.cuda.memory_reserved(device) / 1e9 if torch.cuda.is_available() else 0  # GB
     params = sum([x.numel() for x in module.parameters()]) / 1e6  # M
     torch.cuda.empty_cache()
 

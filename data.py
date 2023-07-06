@@ -1,10 +1,10 @@
+import pytorch_lightning as pl
 import torch
 import torch.distributed
-from torch.utils.data import DataLoader
 import torchvision
 import torchvision.transforms as T
-import pytorch_lightning as pl
 import webdataset as wds
+from torch.utils.data import DataLoader
 
 
 class ImageDataModule(pl.LightningDataModule):

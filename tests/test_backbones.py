@@ -1,8 +1,10 @@
 from typing import List
-from torch import nn
-import torch
-from vision_toolbox import backbones
+
 import pytest
+import torch
+from torch import nn
+
+from vision_toolbox import backbones
 
 
 @pytest.fixture
@@ -16,13 +18,7 @@ darknet_models = ["darknet19", "darknet53", "cspdarknet53"]
 darknet_yolov5_models = [f"darknet_yolov5{x}" for x in ("n", "s", "m", "l", "x")]
 torchvision_models = ["resnet34", "mobilenet_v2", "efficientnet_b0", "regnet_x_400mf"]
 
-all_models = (
-    vovnet_v1_models
-    + vovnet_v2_models
-    + darknet_models
-    + darknet_yolov5_models
-    + torchvision_models
-)
+all_models = vovnet_v1_models + vovnet_v2_models + darknet_models + darknet_yolov5_models + torchvision_models
 
 
 @pytest.mark.parametrize("name", all_models)
