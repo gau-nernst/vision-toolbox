@@ -9,8 +9,8 @@ from .base import BaseBackbone
 
 
 configs = {
-    "HRNet-W32": {"stem_channels": 64, "num_blocks": (1, 4, 3), "num_channels": 32},
-    "HRNetV1-W48": {"stem_channes": 64, "num_blocks": (1, 4, 3), "num_channels": 48},
+    "HRNet-W32": dict(stem_channels=64, num_blocks=(1, 4, 3), num_channels=32),
+    "HRNetV1-W48": dict(stem_channes=64, num_blocks=(1, 4, 3), num_channels=48),
 }
 
 

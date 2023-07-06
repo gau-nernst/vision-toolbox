@@ -33,36 +33,12 @@ _S_embed_dim = 384
 _B_embed_dim = 768
 _L_embed_dim = 1024
 configs = {
-    "PatchConvNet-S60": {
-        **_base,
-        "embed_dim": _S_embed_dim,
-        "depth": 60,
-    },
-    "PatchConvNet-S120": {
-        **_base,
-        "embed_dim": _S_embed_dim,
-        "depth": 120,
-    },
-    "PatchConvNet-B60": {
-        **_base,
-        "embed_dim": _B_embed_dim,
-        "depth": 60,
-    },
-    "PatchConvNet-B120": {
-        **_base,
-        "embed_dim": _B_embed_dim,
-        "depth": 120,
-    },
-    "PatchConvNet-L60": {
-        **_base,
-        "embed_dim": _L_embed_dim,
-        "depth": 60,
-    },
-    "PatchConvNet-L120": {
-        **_base,
-        "embed_dim": _L_embed_dim,
-        "depth": 120,
-    },
+    "PatchConvNet-S60": dict(**_base, embed_dim=_S_embed_dim, depth=60),
+    "PatchConvNet-S120": dict(**_base, embed_dim=_S_embed_dim, depth=120),
+    "PatchConvNet-B60": dict(**_base, embed_dim=_B_embed_dim, depth=60),
+    "PatchConvNet-B120": dict(**_base, embed_dim=_B_embed_dim, depth=120),
+    "PatchConvNet-L60": dict(**_base, embed_dim=_L_embed_dim, depth=60),
+    "PatchConvNet-L120": dict(**_base, embed_dim=_L_embed_dim, depth=120),
 }
 
 

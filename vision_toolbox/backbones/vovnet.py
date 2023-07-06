@@ -24,66 +24,66 @@ __all__ = [
 ]
 
 # https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py
-_base = {
-    "stem_channels": 128,
-    "stage_channels_list": (128, 160, 192, 224),
-    "out_channels_list": (256, 512, 768, 1024),
-    "num_layers_list": (5, 5, 5, 5),
-}
-_slim = {
-    "stage_channels_list": (64, 80, 96, 112),
-    "out_channels_list": (128, 256, 384, 512),
-}
+_base = dict(
+    stem_channels=128,
+    stage_channels_list=(128, 160, 192, 224),
+    out_channels_list=(256, 512, 768, 1024),
+    num_layers_list=(5, 5, 5, 5),
+)
+_slim = dict(
+    stage_channels_list=(64, 80, 96, 112),
+    out_channels_list=(128, 256, 384, 512),
+)
 configs = {
     # VoVNetV1
-    "vovnet-27-slim": {
+    "vovnet-27-slim": dict(
         **_base,
         **_slim,
-        "num_blocks_list": (1, 1, 1, 1),
-        "ese": False,
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet27_slim-79617b9c.pth",
-    },
-    "vovnet-39": {
+        num_blocks_list=(1, 1, 1, 1),
+        ese=False,
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet27_slim-79617b9c.pth",
+    ),
+    "vovnet-39": dict(
         **_base,
-        "num_blocks_list": (1, 1, 2, 2),
-        "ese": False,
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39-ced4435d.pth",
-    },
-    "vovnet-57": {
+        num_blocks_list=(1, 1, 2, 2),
+        ese=False,
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39-ced4435d.pth",
+    ),
+    "vovnet-57": dict(
         **_base,
-        "num_blocks_list": (1, 1, 4, 3),
-        "ese": False,
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57-9929476e.pth",
-    },
+        num_blocks_list=(1, 1, 4, 3),
+        ese=False,
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57-9929476e.pth",
+    ),
     # VoVNetV2
-    "vovnet-19-slim-ese": {
+    "vovnet-19-slim-ese": dict(
         **_base,
         **_slim,
-        "num_layers_list": (3, 3, 3, 3),
-        "num_blocks_list": (1, 1, 1, 1),
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_slim_ese-446e2ae9.pth",
-    },
-    "vovnet-19-ese": {
+        num_layers_list=(3, 3, 3, 3),
+        num_blocks_list=(1, 1, 1, 1),
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_slim_ese-446e2ae9.pth",
+    ),
+    "vovnet-19-ese": dict(
         **_base,
-        "num_layers_list": (3, 3, 3, 3),
-        "num_blocks_list": (1, 1, 1, 1),
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_ese-4410fc5f.pth",
-    },
-    "vovnet-39-ese": {
+        num_layers_list=(3, 3, 3, 3),
+        num_blocks_list=(1, 1, 1, 1),
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_ese-4410fc5f.pth",
+    ),
+    "vovnet-39-ese": dict(
         **_base,
-        "num_blocks_list": (1, 1, 2, 2),
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39_ese-b73bdbe9.pth",
-    },
-    "vovnet-57-ese": {
+        num_blocks_list=(1, 1, 2, 2),
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39_ese-b73bdbe9.pth",
+    ),
+    "vovnet-57-ese": dict(
         **_base,
-        "num_blocks_list": (1, 1, 4, 3),
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57_ese-630a88d1.pth",
-    },
-    "vovnet-99-ese": {
+        num_blocks_list=(1, 1, 4, 3),
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57_ese-630a88d1.pth",
+    ),
+    "vovnet-99-ese": dict(
         **_base,
-        "num_blocks_list": (1, 3, 9, 3),
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet99_ese-56fd52f5.pth",
-    },
+        num_blocks_list=(1, 3, 9, 3),
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet99_ese-56fd52f5.pth",
+    ),
 }
 
 
