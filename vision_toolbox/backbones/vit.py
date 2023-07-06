@@ -28,7 +28,7 @@ class ViT(nn.Module):
         d_model: int,
         n_heads: int,
         patch_size: int,
-        img_size: int | tuple[int, int],
+        img_size: int,
         mlp_dim: int | None = None,
         cls_token: bool = True,
         dropout: float = 0.0,
@@ -36,11 +36,9 @@ class ViT(nn.Module):
     ):
         super().__init__()
         self.patch_embed = nn.Conv2d(3, d_model, patch_size, patch_size)
-        self.cls_token = nn.Parameter(torch.zero_(1, 1, d_model)) if cls_token else None
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, d_model)) if cls_token else None
 
-        if isinstance(img_size, int):
-            img_size = [img_size, img_size]
-        pe_size = (img_size[0] // patch_size) * (img_size[1] // patch_size)
+        pe_size = (img_size // patch_size) ** 2
         if cls_token:
             pe_size += 1
         self.pe = nn.Parameter(torch.empty(pe_size, 1, d_model))
@@ -61,7 +59,7 @@ class ViT(nn.Module):
         return out
 
     @staticmethod
-    def from_config(variant: str, patch_size: int, img_size: int | tuple[int, int]) -> "ViT":
+    def from_config(variant: str, patch_size: int, img_size: int) -> "ViT":
         return ViT(**configs[variant], patch_size=patch_size, img_size=img_size)
 
     # weights from https://github.com/google-research/vision_transformer
