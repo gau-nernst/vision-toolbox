@@ -9,6 +9,9 @@ import torch
 from torch import Tensor, nn
 
 
+__all__ = ["ViT"]
+
+
 configs = dict(
     Ti=dict(n_layers=12, d_model=192, n_heads=3),
     S=dict(n_layers=12, d_model=384, n_heads=6),
