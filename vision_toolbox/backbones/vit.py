@@ -1,6 +1,6 @@
 # https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_vit.py
 
-import re
+from typing import Mapping
 
 import numpy as np
 import torch
@@ -71,52 +71,60 @@ class ViT(nn.Module):
     def from_config(variant: str, patch_size: int, img_size: int | tuple[int, int]) -> "ViT":
         return ViT(**configs[variant], patch_size=patch_size, img_size=img_size)
 
+    # weights from https://github.com/google-research/vision_transformer
+    @staticmethod
+    def from_jax_weights(path: str) -> "ViT":
+        jax_weights: Mapping[str, np.ndarray] = np.load(path)
 
-def convert_jax_weights(jax_weights: dict[str, np.ndarray]) -> dict[str, Tensor]:
-    def _get(key: str) -> Tensor:
-        return torch.from_numpy(jax_weights[key])
+        n_layers = 1
+        while True:
+            if f"Transformer/encoderblock_{n_layers}/LayerNorm_0/bias" not in jax_weights:
+                break
+            n_layers += 1
 
-    torch_weights = dict()
+        d_model = jax_weights["cls"].shape[-1]
+        n_heads = jax_weights["Transformer/encoderblock_0/MultiHeadDotProductAttention_1/key/bias"].shape[0]
+        patch_size = jax_weights["embedding/kernel"].shape[0]
+        img_size = int((jax_weights["Transformer/posembed_input/pos_embedding"].shape[1] - 1) ** 0.5) * patch_size
 
-    def _convert_layer_norm(jax_prefix: str, torch_prefix: str) -> None:
-        torch_weights[f"{torch_prefix}.weight"] = _get(f"{jax_prefix}/scale")
-        torch_weights[f"{torch_prefix}.bias"] = _get(f"{jax_prefix}/bias")
+        def _get(key: str) -> Tensor:
+            return torch.from_numpy(jax_weights[key])
 
-    def _convert_linear(jax_prefix: str, torch_prefix: str) -> None:
-        torch_weights[f"{torch_prefix}.weight"] = _get(f"{jax_prefix}/kernel").T
-        torch_weights[f"{torch_prefix}.bias"] = _get(f"{jax_prefix}/bias")
+        torch_weights = dict()
 
-    def _convert_mha(jax_prefix: str, torch_prefix: str) -> None:
-        w = torch.stack([_get(f"{jax_prefix}/{x}/kernel") for x in ["query", "key", "value"]], 1)
-        torch_weights[f"{torch_prefix}.in_proj_weight"] = w.flatten(1).T
+        def _convert_layer_norm(jax_prefix: str, torch_prefix: str) -> None:
+            torch_weights[f"{torch_prefix}.weight"] = _get(f"{jax_prefix}/scale")
+            torch_weights[f"{torch_prefix}.bias"] = _get(f"{jax_prefix}/bias")
 
-        b = torch.stack([_get(f"{jax_prefix}/{x}/bias") for x in ["query", "key", "value"]], 0)
-        torch_weights[f"{torch_prefix}.in_proj_bias"] = b.flatten()
+        def _convert_linear(jax_prefix: str, torch_prefix: str) -> None:
+            torch_weights[f"{torch_prefix}.weight"] = _get(f"{jax_prefix}/kernel").T
+            torch_weights[f"{torch_prefix}.bias"] = _get(f"{jax_prefix}/bias")
 
-        torch_weights[f"{torch_prefix}.out_proj.weight"] = _get(f"{jax_prefix}/out/kernel").flatten(0, 1)
-        torch_weights[f"{torch_prefix}.out_proj.bias"] = _get(f"{jax_prefix}/out/bias")
+        def _convert_mha(jax_prefix: str, torch_prefix: str) -> None:
+            w = torch.stack([_get(f"{jax_prefix}/{x}/kernel") for x in ["query", "key", "value"]], 1)
+            torch_weights[f"{torch_prefix}.in_proj_weight"] = w.flatten(1).T
 
-    n_layers = 0
-    for key in jax_weights:
-        match = re.search("Transformer/encoderblock_(\d+)/", key)
-        if match is not None:
-            n_layers = max(n_layers, int(match.group(1)) + 1)
+            b = torch.stack([_get(f"{jax_prefix}/{x}/bias") for x in ["query", "key", "value"]], 0)
+            torch_weights[f"{torch_prefix}.in_proj_bias"] = b.flatten()
 
-    torch_weights["cls_token"] = _get("cls")
-    torch_weights["patch_embed.weight"] = _get("embedding/kernel").permute(3, 2, 0, 1)
-    torch_weights["patch_embed.bias"] = _get("embedding/bias")
-    torch_weights["pe"] = _get("Transformer/posembed_input/pos_embedding")
+            torch_weights[f"{torch_prefix}.out_proj.weight"] = _get(f"{jax_prefix}/out/kernel").flatten(0, 1)
+            torch_weights[f"{torch_prefix}.out_proj.bias"] = _get(f"{jax_prefix}/out/bias")
 
-    for idx in range(n_layers):
-        jax_prefix = f"Transformer/encoderblock_{idx}"
-        torch_prefix = f"encoder.layers.{idx}"
+        torch_weights["cls_token"] = _get("cls")
+        torch_weights["patch_embed.weight"] = _get("embedding/kernel").permute(3, 2, 0, 1)
+        torch_weights["patch_embed.bias"] = _get("embedding/bias")
+        torch_weights["pe"] = _get("Transformer/posembed_input/pos_embedding")
 
-        _convert_layer_norm(f"{jax_prefix}/LayerNorm_0", f"{torch_prefix}.norm1")
-        _convert_mha(f"{jax_prefix}/MultiHeadDotProductAttention_1", f"{torch_prefix}.self_attn")
-        _convert_layer_norm(f"{jax_prefix}/LayerNorm_2", f"{torch_prefix}.norm2")
-        _convert_linear(f"{jax_prefix}/MlpBlock_3/Dense_0", f"{torch_prefix}.linear1")
-        _convert_linear(f"{jax_prefix}/MlpBlock_3/Dense_1", f"{torch_prefix}.linear2")
+        for idx in range(n_layers):
+            jax_prefix = f"Transformer/encoderblock_{idx}"
+            torch_prefix = f"encoder.layers.{idx}"
 
-    _convert_layer_norm("Transformer/encoder_norm", "encoder.norm")
+            _convert_layer_norm(f"{jax_prefix}/LayerNorm_0", f"{torch_prefix}.norm1")
+            _convert_mha(f"{jax_prefix}/MultiHeadDotProductAttention_1", f"{torch_prefix}.self_attn")
+            _convert_layer_norm(f"{jax_prefix}/LayerNorm_2", f"{torch_prefix}.norm2")
+            _convert_linear(f"{jax_prefix}/MlpBlock_3/Dense_0", f"{torch_prefix}.linear1")
+            _convert_linear(f"{jax_prefix}/MlpBlock_3/Dense_1", f"{torch_prefix}.linear2")
 
-    return torch_weights
+        _convert_layer_norm("Transformer/encoder_norm", "encoder.norm")
+
+        return ViT(n_layers, d_model, n_heads, patch_size, img_size).load_state_dict(torch_weights)
