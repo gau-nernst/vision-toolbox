@@ -41,21 +41,21 @@ class ViT(nn.Module):
         pe_size = (img_size // patch_size) ** 2
         if cls_token:
             pe_size += 1
-        self.pe = nn.Parameter(torch.empty(pe_size, 1, d_model))
+        self.pe = nn.Parameter(torch.empty(1, pe_size, d_model))
         nn.init.normal_(self.pe, 0, 0.02)
 
         mlp_dim = mlp_dim or d_model * 4
-        layer = nn.TransformerEncoderLayer(d_model, n_heads, mlp_dim, dropout, "gelu", norm_eps, False, True)
+        layer = nn.TransformerEncoderLayer(d_model, n_heads, mlp_dim, dropout, "gelu", norm_eps, True, True)
         self.encoder = nn.TransformerEncoder(layer, n_layers, nn.LayerNorm(d_model, norm_eps))
 
     def forward(self, imgs: Tensor) -> Tensor:
         out = self.patch_embed(imgs)
-        out = out.flatten(2).permute(2, 0, 1)  # (N, C, H, W) -> (H*W, N, C)
+        out = out.flatten(2).transpose(1, 2)  # (N, C, H, W) -> (N, H*W, C)
         if self.cls_token is not None:
-            out = torch.cat([self.cls_token.expand(-1, out.shape[1], -1), out], 0)
+            out = torch.cat([self.cls_token.expand(out.shape[0], -1, -1), out], 1)
         out = out + self.pe
         out = self.encoder(out)
-        out = out[0] if self.cls_token is not None else out.mean(0)
+        out = out[:, 0] if self.cls_token is not None else out.mean(1)
         return out
 
     @staticmethod
@@ -104,7 +104,7 @@ class ViT(nn.Module):
         torch_weights["cls_token"] = _get("cls")
         torch_weights["patch_embed.weight"] = _get("embedding/kernel").permute(3, 2, 0, 1)
         torch_weights["patch_embed.bias"] = _get("embedding/bias")
-        torch_weights["pe"] = _get("Transformer/posembed_input/pos_embedding").view(-1, 1, d_model)
+        torch_weights["pe"] = _get("Transformer/posembed_input/pos_embedding")
 
         for idx in range(n_layers):
             jax_prefix = f"Transformer/encoderblock_{idx}"
