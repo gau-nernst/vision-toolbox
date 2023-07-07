@@ -133,7 +133,7 @@ configs = {
     "darknet-19": dict(
         **_base,
         num_blocks_list=(0, 1, 1, 2, 2),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet19-da4bd7c9.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet19-2cb641ca.pth",
     ),
     # from YOLOv3
     "darknet-53": dict(
