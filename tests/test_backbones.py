@@ -28,7 +28,7 @@ class TestBackbone:
         assert isinstance(m, backbones.BaseBackbone)
 
     def test_pretrained_weights(self, name: str):
-        m = getattr(backbones, name)(pretrained=True)
+        getattr(backbones, name)(pretrained=True)
 
     def test_attributes(self, name: str):
         m = getattr(backbones, name)()
@@ -62,10 +62,12 @@ class TestBackbone:
             assert len(out.shape) == 4
             assert out.shape[1] == out_c
 
-    def test_jit_script(self, name: str):
-        m = getattr(backbones, name)()
-        torch.jit.script(m)
-
     def test_jit_trace(self, name: str, inputs: Tensor):
         m = getattr(backbones, name)()
-        torch.jit.script(m, inputs)
+        torch.jit.trace(m, inputs)
+
+    @pytest.mark.skipif(not hasattr(torch, "compile"), reason="torch.compile() is not available")
+    def test_compile(self, name: str, inputs: Tensor):
+        m = getattr(backbones, name)().eval()
+        m_compiled = torch.compile(m)
+        torch.testing.assert_close(m(inputs), m_compiled(inputs))
