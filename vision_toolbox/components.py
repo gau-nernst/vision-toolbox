@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Callable, Optional
+from typing import Callable
 
 import torch
 import torch.nn.functional as F
@@ -21,13 +21,10 @@ class ConvBnAct(nn.Sequential):
         padding: int = 1,
         dilation: int = 1,
         groups: int = 1,
-        bias: Optional[bool] = None,
         norm_layer: Callable[[int], nn.Module] = nn.BatchNorm2d,
-        act_fn: Callable[[], nn.Module] = partial(nn.ReLU, inplace=True),
+        act: str = "relu",
     ):
         super().__init__()
-        if bias is None:
-            bias = norm_layer is None
         self.conv = nn.Conv2d(
             in_channels,
             out_channels,
@@ -36,17 +33,19 @@ class ConvBnAct(nn.Sequential):
             padding=padding,
             dilation=dilation,
             groups=groups,
-            bias=bias,
+            bias=norm_layer is None,
         )
-        if norm_layer is not None:
-            self.bn = norm_layer(out_channels)
-        if act_fn is not None:
-            self.act = act_fn()
-            nn.init.kaiming_normal_(
-                self.conv.weight,
-                a=getattr(self.act, "negative_slop", 0),
-                mode="fan_out",
-            )
+        self.bn = norm_layer(out_channels) if norm_layer is not None else nn.Identity()
+        self.act = dict(
+            none=nn.Identity,
+            relu=partial(nn.ReLU, True),
+            leaky_relu=partial(nn.LeakyReLU, 0.2, True),
+            swish=partial(nn.SiLU, True),
+            silu=partial(nn.SiLU, True),
+            gelu=nn.GELU,
+        )[act]()
+        if act in ("relu", "leaky_relu"):
+            nn.init.kaiming_normal_(self.conv.weight, 0.2, "fan_out", act)
 
 
 class SeparableConv2d(nn.Sequential):
