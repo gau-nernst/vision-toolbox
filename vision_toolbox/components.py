@@ -7,7 +7,7 @@ from torch import Tensor, nn
 from torchvision.ops import DeformConv2d
 
 
-__all__ = ["ConvNormAct", "SeparableConv2d", "DeformableConv2d", "ESEBlock", "SPPBlock"]
+__all__ = ["ConvNormAct", "SeparableConv2d", "DeformableConv2d", "SPPBlock"]
 
 
 class ConvNormAct(nn.Sequential):
@@ -22,8 +22,6 @@ class ConvNormAct(nn.Sequential):
         norm: str = "bn",
         act: str = "relu",
     ):
-        if kernel_size % 2 == 0:
-            raise ValueError("Even kernel is not supported")
         super().__init__()
         self.conv = nn.Conv2d(
             in_channels,
