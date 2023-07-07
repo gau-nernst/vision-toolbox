@@ -1,27 +1,25 @@
+import math
 from functools import partial
 from typing import Callable
 
 import torch
-import torch.nn.functional as F
-from torch import nn
+from torch import Tensor, nn
 from torchvision.ops import DeformConv2d
 
 
-__all__ = ["ConvBnAct", "SeparableConv2d", "DeformableConv2d", "ESEBlock", "SPPBlock"]
+__all__ = ["ConvNormAct", "SeparableConv2d", "DeformableConv2d", "SPPBlock"]
 
 
-# torchvision.ops.misc.ConvNormActivation initializes weights differently
-class ConvBnAct(nn.Sequential):
+class ConvNormAct(nn.Sequential):
     def __init__(
         self,
         in_channels: int,
         out_channels: int,
         kernel_size: int = 3,
         stride: int = 1,
-        padding: int = 1,
         dilation: int = 1,
         groups: int = 1,
-        norm_layer: Callable[[int], nn.Module] = nn.BatchNorm2d,
+        norm: str = "bn",
         act: str = "relu",
     ):
         super().__init__()
@@ -30,12 +28,12 @@ class ConvBnAct(nn.Sequential):
             out_channels,
             kernel_size,
             stride=stride,
-            padding=padding,
+            padding=math.ceil((kernel_size - stride) / 2),
             dilation=dilation,
             groups=groups,
-            bias=norm_layer is None,
+            bias=norm == "none",
         )
-        self.bn = norm_layer(out_channels) if norm_layer is not None else nn.Identity()
+        self.norm = dict(none=nn.Identity, bn=nn.BatchNorm2d)[norm](out_channels)
         self.act = dict(
             none=nn.Identity,
             relu=partial(nn.ReLU, True),
@@ -61,7 +59,7 @@ class SeparableConv2d(nn.Sequential):
     ):
         super().__init__()
         # don't include bn and act?
-        self.dw = ConvBnAct(
+        self.dw = ConvNormAct(
             in_channels,
             in_channels,
             kernel_size=kernel_size,
@@ -71,26 +69,7 @@ class SeparableConv2d(nn.Sequential):
             groups=in_channels,
             act_fn=act_fn,
         )
-        self.pw = ConvBnAct(in_channels, out_channels, kernel_size=1, padding=0, act_fn=act_fn)
-
-
-# https://arxiv.org/abs/1911.06667
-class ESEBlock(nn.Module):
-    def __init__(
-        self,
-        num_channels: int,
-        gate_fn: Callable[[], nn.Module] = partial(nn.Hardsigmoid, inplace=True),
-    ):
-        # author's code uses Hardsigmoid, although it is not mentioned in the paper
-        # https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py
-        super().__init__()
-        self.linear = nn.Conv2d(num_channels, num_channels, 1)  # use conv so don't need to flatten output
-        self.gate = gate_fn()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = F.adaptive_avg_pool2d(x, (1, 1))
-        out = self.linear(out)
-        return x * self.gate(out)
+        self.pw = ConvNormAct(in_channels, out_channels, kernel_size=1, padding=0, act_fn=act_fn)
 
 
 # https://arxiv.org/abs/1703.06211
@@ -150,7 +129,7 @@ class DeformableConv2d(nn.Module):
         )
         # how to initalize?
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         offset = self.conv_offset(x)
         mask = self.conv_mask(x) if self.conv_mask is not None else None
         return self.conv(x, offset, mask)
@@ -158,21 +137,16 @@ class DeformableConv2d(nn.Module):
 
 # add source. YOLO?
 class SPPBlock(nn.Module):
-    def __init__(self, kernel_size: int = 5, repeats: int = 3, pool_fn: str = "max"):
+    def __init__(self, kernel_size: int = 5, repeats: int = 3, pool: str = "max"):
         # https://github.com/ultralytics/yolov5/blob/master/models/common.py    see SPPF
         # equivalent to [5, 9, 13] max pooling
-        # any convolution here?
-        assert pool_fn in ("max", "avg")
         super().__init__()
-        pool_fn = nn.MaxPool2d if pool_fn == "max" else nn.AvgPool2d
-        padding = (kernel_size - 1) // 2
-        self.pool = pool_fn(kernel_size, stride=1, padding=padding)
+        self.pool = dict(avg=nn.AvgPool2d, max=nn.MaxPool2d)[pool](kernel_size, 1, (kernel_size - 1) // 2)
         self.repeats = repeats
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         outputs = []
-        out = x
         for _ in range(self.repeats):
-            out = self.pool(out)
-            outputs.append(out)
+            x = self.pool(x)
+            outputs.append(x)
         return torch.cat(outputs, dim=1)

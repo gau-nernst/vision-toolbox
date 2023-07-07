@@ -1,10 +1,7 @@
-from typing import List
-
-import torch
-from torch import nn
+from torch import Tensor, nn
 from torchvision.models.resnet import BasicBlock, Bottleneck
 
-from ..components import ConvBnAct
+from ..components import ConvNormAct
 from .base import BaseBackbone
 
 
@@ -28,7 +25,7 @@ class ExchangeBlock(nn.Module):
                 nn.Sequential(*[BasicBlock(in_channels if i == 0 else out_channels, out_channels) for i in range(4)])
             )
 
-    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def forward(self, x: list[Tensor]) -> list[Tensor]:
         outputs = []
         for i, layer in enumerate(self.layers):
             outputs.append(layer(x[i]))
@@ -39,7 +36,7 @@ class HRStage(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def forward(self, x: list[Tensor]) -> list[Tensor]:
         pass
 
 
@@ -48,11 +45,11 @@ class HRNetV1(BaseBackbone):
         super().__init__()
         self.stem = nn.Sequential(
             *[Bottleneck(3 if i == 0 else stem_channels, stem_channels) for i in range(4)],
-            ConvBnAct(stem_channels, num_channels)
+            ConvNormAct(stem_channels, num_channels)
         )
         self.stages = nn.ModuleList()
 
-    def forward_features(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def forward_features(self, x: Tensor) -> list[Tensor]:
         out = self.stem(x)
         return self.stages(out)
 
@@ -61,11 +58,11 @@ class HRNetV2(BaseBackbone):
     def __init__(self, stem_channels):
         super().__init__()
         self.stem = nn.Sequential(
-            ConvBnAct(3, stem_channels, stride=2),
-            ConvBnAct(stem_channels, stem_channels, stride=2),
+            ConvNormAct(3, stem_channels, stride=2),
+            ConvNormAct(stem_channels, stem_channels, stride=2),
         )
         self.stages = nn.ModuleList()
 
-    def forward_features(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def forward_features(self, x: Tensor) -> list[Tensor]:
         out = self.stem(x)
         return self.stages(out)

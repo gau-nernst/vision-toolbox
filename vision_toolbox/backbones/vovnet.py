@@ -2,12 +2,10 @@
 # VoVNetV1: https://arxiv.org/abs/1904.09730
 # VoVNetV2: https://arxiv.org/abs/1911.06667 (CenterMask)
 
-from typing import Iterable, Tuple
-
 import torch
-from torch import nn
+from torch import Tensor, nn
 
-from ..components import ConvBnAct, ESEBlock
+from ..components import ConvNormAct
 from .base import BaseBackbone
 
 
@@ -41,19 +39,19 @@ configs = {
         **_slim,
         "num_blocks_list": (1, 1, 1, 1),
         "ese": False,
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet27_slim-79617b9c.pth",
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet27_slim-dd43306a.pth",
     },
     "vovnet-39": dict(
         **_base,
         num_blocks_list=(1, 1, 2, 2),
         ese=False,
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39-ced4435d.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39-4c79d629.pth",
     ),
     "vovnet-57": dict(
         **_base,
         num_blocks_list=(1, 1, 4, 3),
         ese=False,
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57-9929476e.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57-ecb9cc34.pth",
     ),
     # VoVNetV2
     "vovnet-19-slim-ese": {
@@ -61,30 +59,41 @@ configs = {
         **_slim,
         "num_layers_list": (3, 3, 3, 3),
         "num_blocks_list": (1, 1, 1, 1),
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_slim_ese-446e2ae9.pth",
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_slim_ese-f8075640.pth",
     },
     "vovnet-19-ese": {
         **_base,
         "num_layers_list": (3, 3, 3, 3),
         "num_blocks_list": (1, 1, 1, 1),
-        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_ese-4410fc5f.pth",
+        "weights": "https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet19_ese-a077657e.pth",
     },
     "vovnet-39-ese": dict(
         **_base,
         num_blocks_list=(1, 1, 2, 2),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39_ese-b73bdbe9.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet39_ese-9ce81b0d.pth",
     ),
     "vovnet-57-ese": dict(
         **_base,
         num_blocks_list=(1, 1, 4, 3),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57_ese-630a88d1.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet57_ese-ae1a7f89.pth",
     ),
     "vovnet-99-ese": dict(
         **_base,
         num_blocks_list=(1, 3, 9, 3),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet99_ese-56fd52f5.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/vovnet99_ese-713f3062.pth",
     ),
 }
+
+
+class ESEBlock(nn.Module):
+    def __init__(self, num_channels: int) -> None:
+        super().__init__()
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.linear = nn.Conv2d(num_channels, num_channels, 1)
+        self.gate = nn.Hardsigmoid(inplace=True)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x * self.gate(self.linear(self.pool(x)))
 
 
 class OSABlock(nn.Module):
@@ -96,18 +105,18 @@ class OSABlock(nn.Module):
         out_channels: int,
         residual: bool = True,
         ese: bool = True,
-    ):
+    ) -> None:
         super().__init__()
         self.convs = nn.ModuleList(
-            [ConvBnAct(in_channels if i == 0 else mid_channels, mid_channels) for i in range(num_layers)]
+            [ConvNormAct(in_channels if i == 0 else mid_channels, mid_channels) for i in range(num_layers)]
         )
         concat_channels = in_channels + mid_channels * num_layers
-        self.out_conv = ConvBnAct(concat_channels, out_channels, kernel_size=1, padding=0)
+        self.out_conv = ConvNormAct(concat_channels, out_channels, 1)
 
         self.ese = ESEBlock(out_channels) if ese else None
         self.residual = residual and (in_channels == out_channels)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         outputs = []
         out = x
         outputs.append(out)
@@ -130,28 +139,28 @@ class VoVNet(BaseBackbone):
     def __init__(
         self,
         stem_channels: int,
-        num_blocks_list: Iterable[int],
-        stage_channels_list: Iterable[int],
-        num_layers_list: Iterable[int],
-        out_channels_list: Iterable[int],
+        num_blocks_list: list[int],
+        stage_channels_list: list[int],
+        num_layers_list: list[int],
+        out_channels_list: list[int],
         residual: bool = True,
         ese: bool = True,
-    ):
+    ) -> None:
         super().__init__()
         self.out_channels_list = (stem_channels,) + tuple(out_channels_list)
         self.stride = 32
 
         self.stem = nn.Sequential(
-            ConvBnAct(3, stem_channels // 2, stride=2),
-            ConvBnAct(stem_channels // 2, stem_channels // 2),
-            ConvBnAct(stem_channels // 2, stem_channels),
+            ConvNormAct(3, stem_channels // 2, stride=2),
+            ConvNormAct(stem_channels // 2, stem_channels // 2),
+            ConvNormAct(stem_channels // 2, stem_channels),
         )
 
         self.stages = nn.ModuleList()
         in_c = stem_channels
         for n, stage_c, n_l, out_c in zip(num_blocks_list, stage_channels_list, num_layers_list, out_channels_list):
             stage = nn.Sequential()
-            stage.add_module("max_pool", nn.MaxPool2d(3, 2, padding=1))
+            stage.add_module("max_pool", nn.MaxPool2d(3, 2, 1))
             for i in range(n):
                 stage.add_module(
                     f"module_{i}",
@@ -160,7 +169,7 @@ class VoVNet(BaseBackbone):
                 in_c = out_c
             self.stages.append(stage)
 
-    def get_feature_maps(self, x):
+    def get_feature_maps(self, x: Tensor) -> list[Tensor]:
         outputs = [self.stem(x)]
         for s in self.stages:
             outputs.append(s(outputs[-1]))
