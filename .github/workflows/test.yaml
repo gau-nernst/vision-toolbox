@@ -11,13 +11,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pytorch-version: ["1.13.*", "2.0.*"]
+        pytorch-version: ["1.13", "2.0"]
         python-version: ["3.10"]
         include:
-          - pytorch-version: "1.13.*"
-            torchvision-version: "0.14.*"
-          - pytorch-version: "2.0.*"
-            torchvision-version: "0.15.*"
+          - pytorch-version: "1.13"
+            torchvision-version: "0.14"
+          - pytorch-version: "2.0"
+            torchvision-version: "0.15"
 
     steps:
       - name: Checkout
@@ -30,7 +30,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install torch==${{ matrix.pytorch-version }} torchvision==${{ matrix.torchvision-version }} --extra-index-url https://download.pytorch.org/whl/cpu
+          pip install torch==${{ matrix.pytorch-version }}.* torchvision==${{ matrix.torchvision-version }}.* --extra-index-url https://download.pytorch.org/whl/cpu
           pip install pytest
 
       - name: Run tests
