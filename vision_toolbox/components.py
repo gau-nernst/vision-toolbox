@@ -1,3 +1,4 @@
+import math
 from functools import partial
 from typing import Callable
 
@@ -7,35 +8,35 @@ from torch import nn
 from torchvision.ops import DeformConv2d
 
 
-__all__ = ["ConvBnAct", "SeparableConv2d", "DeformableConv2d", "ESEBlock", "SPPBlock"]
+__all__ = ["ConvNormAct", "SeparableConv2d", "DeformableConv2d", "ESEBlock", "SPPBlock"]
 
 
-# torchvision.ops.misc.ConvNormActivation initializes weights differently
-class ConvBnAct(nn.Sequential):
+class ConvNormAct(nn.Sequential):
     def __init__(
         self,
         in_channels: int,
         out_channels: int,
         kernel_size: int = 3,
         stride: int = 1,
-        padding: int = 1,
         dilation: int = 1,
         groups: int = 1,
-        norm_layer: Callable[[int], nn.Module] = nn.BatchNorm2d,
+        norm: str = "bn",
         act: str = "relu",
     ):
+        if kernel_size % 2 == 0:
+            raise ValueError("Even kernel is not supported")
         super().__init__()
         self.conv = nn.Conv2d(
             in_channels,
             out_channels,
             kernel_size,
             stride=stride,
-            padding=padding,
+            padding=math.ceil((kernel_size - stride) / 2),
             dilation=dilation,
             groups=groups,
-            bias=norm_layer is None,
+            bias=norm != "none",
         )
-        self.bn = norm_layer(out_channels) if norm_layer is not None else nn.Identity()
+        self.norm = dict(none=nn.Identity, bn=nn.BatchNorm2d)[norm](out_channels)
         self.act = dict(
             none=nn.Identity,
             relu=partial(nn.ReLU, True),
@@ -61,7 +62,7 @@ class SeparableConv2d(nn.Sequential):
     ):
         super().__init__()
         # don't include bn and act?
-        self.dw = ConvBnAct(
+        self.dw = ConvNormAct(
             in_channels,
             in_channels,
             kernel_size=kernel_size,
@@ -71,7 +72,7 @@ class SeparableConv2d(nn.Sequential):
             groups=in_channels,
             act_fn=act_fn,
         )
-        self.pw = ConvBnAct(in_channels, out_channels, kernel_size=1, padding=0, act_fn=act_fn)
+        self.pw = ConvNormAct(in_channels, out_channels, kernel_size=1, padding=0, act_fn=act_fn)
 
 
 # https://arxiv.org/abs/1911.06667

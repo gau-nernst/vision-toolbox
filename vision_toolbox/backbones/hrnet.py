@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torchvision.models.resnet import BasicBlock, Bottleneck
 
-from ..components import ConvBnAct
+from ..components import ConvNormAct
 from .base import BaseBackbone
 
 
@@ -48,7 +48,7 @@ class HRNetV1(BaseBackbone):
         super().__init__()
         self.stem = nn.Sequential(
             *[Bottleneck(3 if i == 0 else stem_channels, stem_channels) for i in range(4)],
-            ConvBnAct(stem_channels, num_channels)
+            ConvNormAct(stem_channels, num_channels)
         )
         self.stages = nn.ModuleList()
 
@@ -61,8 +61,8 @@ class HRNetV2(BaseBackbone):
     def __init__(self, stem_channels):
         super().__init__()
         self.stem = nn.Sequential(
-            ConvBnAct(3, stem_channels, stride=2),
-            ConvBnAct(stem_channels, stem_channels, stride=2),
+            ConvNormAct(3, stem_channels, stride=2),
+            ConvNormAct(stem_channels, stem_channels, stride=2),
         )
         self.stages = nn.ModuleList()
 

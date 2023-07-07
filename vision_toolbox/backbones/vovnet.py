@@ -7,7 +7,7 @@ from typing import Iterable, Tuple
 import torch
 from torch import nn
 
-from ..components import ConvBnAct, ESEBlock
+from ..components import ConvNormAct, ESEBlock
 from .base import BaseBackbone
 
 
@@ -99,10 +99,10 @@ class OSABlock(nn.Module):
     ):
         super().__init__()
         self.convs = nn.ModuleList(
-            [ConvBnAct(in_channels if i == 0 else mid_channels, mid_channels) for i in range(num_layers)]
+            [ConvNormAct(in_channels if i == 0 else mid_channels, mid_channels) for i in range(num_layers)]
         )
         concat_channels = in_channels + mid_channels * num_layers
-        self.out_conv = ConvBnAct(concat_channels, out_channels, kernel_size=1, padding=0)
+        self.out_conv = ConvNormAct(concat_channels, out_channels, kernel_size=1, padding=0)
 
         self.ese = ESEBlock(out_channels) if ese else None
         self.residual = residual and (in_channels == out_channels)
@@ -142,9 +142,9 @@ class VoVNet(BaseBackbone):
         self.stride = 32
 
         self.stem = nn.Sequential(
-            ConvBnAct(3, stem_channels // 2, stride=2),
-            ConvBnAct(stem_channels // 2, stem_channels // 2),
-            ConvBnAct(stem_channels // 2, stem_channels),
+            ConvNormAct(3, stem_channels // 2, stride=2),
+            ConvNormAct(stem_channels // 2, stem_channels // 2),
+            ConvNormAct(stem_channels // 2, stem_channels),
         )
 
         self.stages = nn.ModuleList()

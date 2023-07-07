@@ -8,7 +8,7 @@ from typing import Callable, Iterable, List
 import torch
 from torch import nn
 
-from ..components import ConvBnAct
+from ..components import ConvNormAct
 from .base import BaseBackbone
 
 
@@ -30,8 +30,8 @@ class DarknetBlock(nn.Module):
     def __init__(self, in_channels: int, expansion: float = 0.5):
         super().__init__()
         mid_channels = int(in_channels * expansion)
-        self.conv1 = ConvBnAct(in_channels, mid_channels, kernel_size=1, padding=0)
-        self.conv2 = ConvBnAct(mid_channels, in_channels)
+        self.conv1 = ConvNormAct(in_channels, mid_channels, 1)
+        self.conv2 = ConvNormAct(mid_channels, in_channels)
 
     def forward(self, x):
         out = self.conv1(x)
@@ -42,7 +42,7 @@ class DarknetBlock(nn.Module):
 class DarknetStage(nn.Sequential):
     def __init__(self, n: int, in_channels: int, out_channels: int):
         super().__init__()
-        self.conv = ConvBnAct(in_channels, out_channels, stride=2)
+        self.conv = ConvNormAct(in_channels, out_channels, stride=2)
         self.blocks = nn.Sequential(*[DarknetBlock(out_channels) for _ in range(n)])
 
 
@@ -50,13 +50,13 @@ class CSPDarknetStage(nn.Module):
     def __init__(self, n: int, in_channels: int, out_channels: int):
         assert n > 0
         super().__init__()
-        self.conv = ConvBnAct(in_channels, out_channels, stride=2)
+        self.conv = ConvNormAct(in_channels, out_channels, stride=2)
 
         half_channels = out_channels // 2
-        self.conv1 = ConvBnAct(out_channels, half_channels, kernel_size=1, padding=0)
-        self.conv2 = ConvBnAct(out_channels, half_channels, kernel_size=1, padding=0)
+        self.conv1 = ConvNormAct(out_channels, half_channels, 1)
+        self.conv2 = ConvNormAct(out_channels, half_channels, 1)
         self.blocks = nn.Sequential(*[DarknetBlock(half_channels, expansion=1) for _ in range(n)])
-        self.out_conv = ConvBnAct(out_channels, out_channels, kernel_size=1, padding=0)
+        self.out_conv = ConvNormAct(out_channels, out_channels, 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.conv(x)
@@ -82,11 +82,11 @@ class Darknet(BaseBackbone):
         self.out_channels_list = tuple(num_channels_list)
         self.stride = 32
 
-        self.stem = ConvBnAct(3, stem_channels)
+        self.stem = ConvNormAct(3, stem_channels)
         self.stages = nn.ModuleList()
         in_c = stem_channels
         for n, c in zip(num_blocks_list, num_channels_list):
-            self.stages.append(stage_cls(n, in_c, c) if n > 0 else ConvBnAct(in_c, c, stride=2))
+            self.stages.append(stage_cls(n, in_c, c) if n > 0 else ConvNormAct(in_c, c, stride=2))
             in_c = c
 
     def get_feature_maps(self, x):
@@ -110,7 +110,7 @@ class DarknetYolov5(BaseBackbone):
         self.out_channels_list = (stem_channels,) + tuple(num_channels_list)
         self.stride = 32
 
-        self.stem = ConvBnAct(3, stem_channels, kernel_size=6, stride=2, padding=2)
+        self.stem = ConvNormAct(3, stem_channels, 6, 2)
         self.stages = nn.ModuleList()
         in_c = stem_channels
         for n, c in zip(num_blocks_list, num_channels_list):

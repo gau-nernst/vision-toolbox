@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from .components import ConvBnAct, SeparableConv2d
+from .components import ConvNormAct, SeparableConv2d
 
 
 __all__ = ["FPN", "PAN", "BiFPN"]
@@ -49,7 +49,7 @@ class FPN(nn.Module):
         in_channels_list: Iterable[int],
         out_channels: int = 256,
         fuse_fn: str = "sum",
-        block: Callable[[int, int], nn.Module] = ConvBnAct,
+        block: Callable[[int, int], nn.Module] = ConvNormAct,
         interpolation_mode: str = "nearest",
         top_down: bool = True,
     ):
@@ -96,7 +96,7 @@ class PAN(nn.Module):
         in_channels_list: Iterable[int],
         out_channels: int = 256,
         fuse_fn: str = "sum",
-        block: Callable[[int, int], nn.Module] = ConvBnAct,
+        block: Callable[[int, int], nn.Module] = ConvNormAct,
         interpolation_mode: str = "nearest",
     ):
         super().__init__()
