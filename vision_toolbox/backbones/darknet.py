@@ -139,7 +139,7 @@ configs = {
     "darknet-53": dict(
         **_base,
         num_blocks_list=(1, 2, 8, 8, 4),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet53-7433abc1.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet53-94427f5b.pth",
     ),
     # from CSPNet/YOLOv4
     "cspdarknet-53": dict(
@@ -153,31 +153,31 @@ configs = {
         stem_channels=int(_darknet_yolov5_stem_channels / 4),
         num_blocks_list=tuple(int(x / 3) for x in _darknet_yolov5_num_blocks_list),
         num_channels_list=tuple(int(x / 4) for x in _darknet_yolov5_num_channels_list),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5n-a9335553.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5n-68f182f1.pth",
     ),
     "darknet-yolov5s": dict(
         stem_channels=int(_darknet_yolov5_stem_channels / 2),
         num_blocks_list=tuple(int(x / 3) for x in _darknet_yolov5_num_blocks_list),
         num_channels_list=tuple(int(x / 2) for x in _darknet_yolov5_num_channels_list),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5s-e8dba89f.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5s-175f7462.pth",
     ),
     "darknet-yolov5m": dict(
         stem_channels=int(_darknet_yolov5_stem_channels * 3 / 4),
         num_blocks_list=tuple(int(x * 2 / 3) for x in _darknet_yolov5_num_blocks_list),
         num_channels_list=tuple(int(x * 3 / 4) for x in _darknet_yolov5_num_channels_list),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5m-a1eb31bd.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5m-9866aa40.pth",
     ),
     "darknet-yolov5l": dict(
         stem_channels=_darknet_yolov5_stem_channels,
         num_blocks_list=_darknet_yolov5_num_blocks_list,
         num_channels_list=_darknet_yolov5_num_channels_list,
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5l-7384c740.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5l-8e25d388.pth",
     ),
     "darknet-yolov5x": dict(
         stem_channels=int(_darknet_yolov5_stem_channels * 5 / 4),
         num_blocks_list=tuple(int(x * 4 / 3) for x in _darknet_yolov5_num_blocks_list),
         num_channels_list=tuple(int(x * 5 / 4) for x in _darknet_yolov5_num_channels_list),
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5x-bf388a43.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/darknet_yolov5x-0ed0c035.pth",
     ),
 }
 
