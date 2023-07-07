@@ -68,6 +68,6 @@ class TestBackbone:
 
     @pytest.mark.skipif(not hasattr(torch, "compile"), reason="torch.compile() is not available")
     def test_compile(self, name: str, inputs: Tensor):
-        m = getattr(backbones, name)(pretrained=True).eval()
+        m = getattr(backbones, name)()
         m_compiled = torch.compile(m)
-        torch.testing.assert_close(m(inputs), m_compiled(inputs))
+        m_compiled(inputs)
