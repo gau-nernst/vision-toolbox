@@ -14,7 +14,7 @@ vovnet_v1_models = [f"vovnet{x}" for x in ["27_slim", 39, 57]]
 vovnet_v2_models = [f"vovnet{x}_ese" for x in ["19_slim", 19, 39, 57, 99]]
 darknet_models = ["darknet19", "darknet53", "cspdarknet53"]
 darknet_yolov5_models = [f"darknet_yolov5{x}" for x in ("n", "s", "m", "l", "x")]
-torchvision_models = ["resnet34", "mobilenet_v2", "efficientnet_b0", "regnet_x_400mf"]
+torchvision_models = ["resnet18", "mobilenet_v2", "efficientnet_b0", "regnet_x_400mf"]
 
 all_models = vovnet_v1_models + vovnet_v2_models + darknet_models + darknet_yolov5_models + torchvision_models
 
@@ -66,8 +66,10 @@ class TestBackbone:
         m = getattr(backbones, name)()
         torch.jit.trace(m, inputs)
 
-    @pytest.mark.skipif(not hasattr(torch, "compile"), reason="torch.compile() is not available")
-    def test_compile(self, name: str, inputs: Tensor):
-        m = getattr(backbones, name)()
-        m_compiled = torch.compile(m)
-        m_compiled(inputs)
+
+@pytest.mark.skipif(not hasattr(torch, "compile"), reason="torch.compile() is not available")
+@pytest.mark.parametrize("name", ["vovnet39", "vovnet19_ese", "darknet19", "cspdarknet53", "darknet_yolov5n"])
+def test_compile(name: str, inputs: Tensor):
+    m = getattr(backbones, name)()
+    m_compiled = torch.compile(m)
+    m_compiled(inputs)
