@@ -31,7 +31,7 @@ class ConvNormAct(nn.Sequential):
             padding=math.ceil((kernel_size - stride) / 2),
             dilation=dilation,
             groups=groups,
-            bias=norm != "none",
+            bias=norm == "none",
         )
         self.norm = dict(none=nn.Identity, bn=nn.BatchNorm2d)[norm](out_channels)
         self.act = dict(
