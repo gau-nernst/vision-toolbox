@@ -49,7 +49,7 @@ class HRNetV1(BaseBackbone):
         )
         self.stages = nn.ModuleList()
 
-    def forward_features(self, x: Tensor) -> List[Tensor]:
+    def forward_features(self, x: Tensor) -> list[Tensor]:
         out = self.stem(x)
         return self.stages(out)
 
