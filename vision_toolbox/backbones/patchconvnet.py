@@ -3,7 +3,7 @@
 import warnings
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 
 
 try:
@@ -86,7 +86,7 @@ class PatchConvBlock(nn.Module):
 
         self.drop_path = StochasticDepth(drop_path, "row") if drop_path > 0 else nn.Identity()
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: Tensor):
         return x + self.drop_path(self.layers(x) * self.layer_scale)
 
 
@@ -106,7 +106,7 @@ class AttentionPooling(nn.Module):
         self.layer_scale_2 = nn.Parameter(torch.ones(embed_dim) * layer_scale_init)
         self.norm_3 = nn.LayerNorm(embed_dim)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: Tensor):
         # (N, HW, C)
         cls_token = self.cls_token.expand(x.shape[0], 1, -1)
         out = torch.cat((cls_token, x), dim=1)
@@ -159,7 +159,7 @@ class PatchConvNet(BaseBackbone):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: Tensor):
         out = self.stem(x)
 
         if self.norm_type == "ln":

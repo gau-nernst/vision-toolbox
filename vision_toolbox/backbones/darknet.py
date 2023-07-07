@@ -3,10 +3,10 @@
 # YOLOv3: https://arxiv.org/abs/1804.02767
 # CSPNet: https://openaccess.thecvf.com/content_CVPRW_2020/papers/w28/Wang_CSPNet_A_New_Backbone_That_Can_Enhance_Learning_Capability_of_CVPRW_2020_paper.pdf
 
-from typing import Callable, Iterable, List
+from typing import Callable, Iterable
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 
 from ..components import ConvNormAct
 from .base import BaseBackbone
@@ -58,7 +58,7 @@ class CSPDarknetStage(nn.Module):
         self.blocks = nn.Sequential(*[DarknetBlock(half_channels, expansion=1) for _ in range(n)])
         self.out_conv = ConvNormAct(out_channels, out_channels, 1)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         out = self.conv(x)
 
         # using 2 convs is faster than using 1 conv then split
@@ -74,8 +74,8 @@ class Darknet(BaseBackbone):
     def __init__(
         self,
         stem_channels: int,
-        num_blocks_list: Iterable[int],
-        num_channels_list: Iterable[int],
+        num_blocks_list: list[int],
+        num_channels_list: list[int],
         stage_cls: Callable[..., nn.Module] = DarknetStage,
     ):
         super().__init__()
@@ -102,8 +102,8 @@ class DarknetYolov5(BaseBackbone):
     def __init__(
         self,
         stem_channels: int,
-        num_blocks_list: Iterable[int],
-        num_channels_list: Iterable[int],
+        num_blocks_list: list[int],
+        num_channels_list: list[int],
         stage_cls: Callable[..., nn.Module] = CSPDarknetStage,
     ):
         super().__init__()
@@ -117,7 +117,7 @@ class DarknetYolov5(BaseBackbone):
             self.stages.append(stage_cls(n, in_c, c))
             in_c = c
 
-    def get_feature_maps(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def get_feature_maps(self, x: Tensor) -> list[Tensor]:
         outputs = [self.stem(x)]
         for s in self.stages:
             outputs.append(s(outputs[-1]))

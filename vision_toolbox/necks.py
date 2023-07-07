@@ -1,9 +1,8 @@
-from abc import ABCMeta, abstractmethod
-from typing import Callable, Iterable, List
+from typing import Callable
 
 import torch
 import torch.nn.functional as F
-from torch import nn
+from torch import Tensor, nn
 
 from .components import ConvNormAct, SeparableConv2d
 
@@ -12,22 +11,22 @@ __all__ = ["FPN", "PAN", "BiFPN"]
 
 
 # support torchscript
-def aggregate_concat(x: List[torch.Tensor]) -> torch.Tensor:
+def aggregate_concat(x: list[Tensor]) -> Tensor:
     return torch.cat(x, dim=1)  # torchscript does not support partial
 
 
-def aggregate_sum(x: List[torch.Tensor]) -> torch.Tensor:
+def aggregate_sum(x: list[Tensor]) -> Tensor:
     out = x[0]
     for o in x[1:]:
         out = out + o  # += will do inplace addition
     return out
 
 
-def aggregate_avg(x: List[torch.Tensor]) -> torch.Tensor:
+def aggregate_avg(x: list[Tensor]) -> Tensor:
     return aggregate_sum(x) / len(x)
 
 
-def aggregate_max(x: List[torch.Tensor]) -> torch.Tensor:
+def aggregate_max(x: list[Tensor]) -> Tensor:
     out = x[0]
     for o in x[1:]:
         out = torch.maximum(out, o)
@@ -46,7 +45,7 @@ _aggregate_functions = {
 class FPN(nn.Module):
     def __init__(
         self,
-        in_channels_list: Iterable[int],
+        in_channels_list: list[int],
         out_channels: int = 256,
         fuse_fn: str = "sum",
         block: Callable[[int, int], nn.Module] = ConvNormAct,
@@ -68,20 +67,20 @@ class FPN(nn.Module):
         in_c = out_channels if fuse_fn == "sum" else out_channels * 2
         self.output_convs = nn.ModuleList([block(in_c, out_channels) for _ in range(len(in_channels_list) - 1)])
 
-    def _fuse_top_down(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def _fuse_top_down(self, x: list[Tensor]) -> list[Tensor]:
         for i, output_conv in enumerate(self.output_convs):
             x[-2 - i] = self.fuse([x[-2 - i], self.upsample(x[-1 - i])])  # 2, 1, 0
             x[-2 - i] = output_conv(x[-2 - i])
         return x
 
-    def _fuse_bottom_up(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def _fuse_bottom_up(self, x: list[Tensor]) -> list[Tensor]:
         for i, output_conv in enumerate(self.output_convs):
             x[i + 1] = self.fuse([x[i + 1], self.upsample(x[i])])  # 1, 2, 3
             x[i + 1] = output_conv(x[i + 1])
         return x
 
     # input feature maps are ordered from bottom (largest) to top (smallest)
-    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def forward(self, x: list[Tensor]) -> list[Tensor]:
         assert len(x) == len(self.lateral_convs)
         outputs = [l_conv(x[i]) for i, l_conv in enumerate(self.lateral_convs)]
         if self.top_down:
@@ -93,7 +92,7 @@ class FPN(nn.Module):
 class PAN(nn.Module):
     def __init__(
         self,
-        in_channels_list: Iterable[int],
+        in_channels_list: list[int],
         out_channels: int = 256,
         fuse_fn: str = "sum",
         block: Callable[[int, int], nn.Module] = ConvNormAct,
@@ -115,7 +114,7 @@ class PAN(nn.Module):
             interpolation_mode=interpolation_mode,
         )
 
-    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def forward(self, x: list[Tensor]) -> list[Tensor]:
         outputs = self.top_down(x)
         outputs = self.bottom_up(outputs)
         return outputs
@@ -126,7 +125,7 @@ class PAN(nn.Module):
 class BiFPN(nn.Module):
     def __init__(
         self,
-        in_channels_list: Iterable[int],
+        in_channels_list: list[int],
         out_channels: int = 64,
         num_layers: int = 1,
         block: Callable[[int, int], nn.Module] = SeparableConv2d,
@@ -149,7 +148,7 @@ class BiFPN(nn.Module):
             ]
         )
 
-    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def forward(self, x: list[Tensor]) -> list[Tensor]:
         assert len(x) == len(self.laterals)
         outputs = [l_conv(x[i]) for i, l_conv in enumerate(self.laterals)]
         for layer in self.layers:
@@ -179,7 +178,7 @@ class BiFPNLayer(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2.0, mode=interpolation_mode)
         self.downsample = nn.Upsample(scale_factor=0.5, mode=interpolation_mode)
 
-    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def forward(self, x: list[Tensor]) -> list[Tensor]:
         # top-down, P6td = conv(P6in + resize(P7td))
         tds = list(x)  # make a copy
         for i, td_fuse in enumerate(self.td_fuses):
@@ -208,7 +207,7 @@ class WeightedFeatureFusion(nn.Module):
         self.conv = block(num_channels, num_channels)
         self.eps = eps
 
-    def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
+    def forward(self, x: list[Tensor]) -> Tensor:
         weights = F.relu(self.weights)
         out = 0
         for i in range(weights.shape[0]):

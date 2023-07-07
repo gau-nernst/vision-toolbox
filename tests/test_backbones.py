@@ -1,8 +1,6 @@
-from typing import List
-
 import pytest
 import torch
-from torch import nn
+from torch import Tensor, nn
 
 from vision_toolbox import backbones
 
@@ -46,21 +44,21 @@ class TestBackbone:
         assert hasattr(m, "get_feature_maps")
         assert callable(m.get_feature_maps)
 
-    def test_forward(self, name: str, inputs: torch.Tensor):
+    def test_forward(self, name: str, inputs: Tensor):
         m = getattr(backbones, name)()
         outputs = m(inputs)
 
-        assert isinstance(outputs, torch.Tensor)
+        assert isinstance(outputs, Tensor)
         assert len(outputs.shape) == 4
 
-    def test_get_feature_maps(self, name: str, inputs: torch.Tensor):
+    def test_get_feature_maps(self, name: str, inputs: Tensor):
         m = getattr(backbones, name)()
         outputs = m.get_feature_maps(inputs)
 
         assert isinstance(outputs, list)
         assert len(outputs) == len(m.out_channels_list)
         for out, out_c in zip(outputs, m.out_channels_list):
-            assert isinstance(out, torch.Tensor)
+            assert isinstance(out, Tensor)
             assert len(out.shape) == 4
             assert out.shape[1] == out_c
 
@@ -68,6 +66,6 @@ class TestBackbone:
         m = getattr(backbones, name)()
         torch.jit.script(m)
 
-    def test_jit_trace(self, name: str, inputs: torch.Tensor):
+    def test_jit_trace(self, name: str, inputs: Tensor):
         m = getattr(backbones, name)()
         torch.jit.script(m, inputs)

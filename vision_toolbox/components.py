@@ -3,8 +3,7 @@ from functools import partial
 from typing import Callable
 
 import torch
-import torch.nn.functional as F
-from torch import nn
+from torch import Tensor, nn
 from torchvision.ops import DeformConv2d
 
 
@@ -132,7 +131,7 @@ class DeformableConv2d(nn.Module):
         )
         # how to initalize?
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         offset = self.conv_offset(x)
         mask = self.conv_mask(x) if self.conv_mask is not None else None
         return self.conv(x, offset, mask)
@@ -151,7 +150,7 @@ class SPPBlock(nn.Module):
         self.pool = pool_fn(kernel_size, stride=1, padding=padding)
         self.repeats = repeats
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         outputs = []
         out = x
         for _ in range(self.repeats):

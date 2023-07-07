@@ -7,7 +7,7 @@ import time
 import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
-from torch import nn
+from torch import Tensor, nn
 
 
 # https://github.com/pytorch/vision/blob/main/references/classification/transforms.py
@@ -19,7 +19,7 @@ class RandomMixup(nn.Module):
         self.alpha = alpha
         self.inplace = inplace
 
-    def forward(self, batch: torch.Tensor, target: torch.Tensor):
+    def forward(self, batch: Tensor, target: Tensor) -> tuple[Tensor, Tensor]:
         if not self.inplace:
             batch = batch.clone()
             target = target.clone()
@@ -35,7 +35,7 @@ class RandomMixup(nn.Module):
         target_rolled = target.roll(1, 0)
 
         # Implemented as on mixup paper, page 3.
-        lambda_param = float(torch._sample_dirichlet(torch.tensor([self.alpha, self.alpha]))[0])
+        lambda_param = float(torch._sample_dirichlet(Tensor([self.alpha, self.alpha]))[0])
         batch_rolled.mul_(1.0 - lambda_param)
         batch.mul_(lambda_param).add_(batch_rolled)
 
@@ -53,7 +53,7 @@ class RandomCutmix(nn.Module):
         self.alpha = alpha
         self.inplace = inplace
 
-    def forward(self, batch: torch.Tensor, target: torch.Tensor):
+    def forward(self, batch: Tensor, target: Tensor) -> tuple[Tensor, Tensor]:
         if not self.inplace:
             batch = batch.clone()
             target = target.clone()
@@ -129,7 +129,7 @@ def extract_backbone_weights(lightning_ckpt_path, save_name, save_dir=None):
 
 
 # Modified from YOLOv5 utils/torch_utils.py
-def profile(module: nn.Module, input: torch.Tensor = None, n: int = 10, device="cpu"):
+def profile(module: nn.Module, input: Tensor = None, n: int = 10, device="cpu"):
     from fvcore.nn import FlopCountAnalysis
 
     if input is None:

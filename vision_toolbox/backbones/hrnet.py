@@ -1,7 +1,4 @@
-from typing import List
-
-import torch
-from torch import nn
+from torch import Tensor, nn
 from torchvision.models.resnet import BasicBlock, Bottleneck
 
 from ..components import ConvNormAct
@@ -28,7 +25,7 @@ class ExchangeBlock(nn.Module):
                 nn.Sequential(*[BasicBlock(in_channels if i == 0 else out_channels, out_channels) for i in range(4)])
             )
 
-    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def forward(self, x: list[Tensor]) -> list[Tensor]:
         outputs = []
         for i, layer in enumerate(self.layers):
             outputs.append(layer(x[i]))
@@ -39,7 +36,7 @@ class HRStage(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
+    def forward(self, x: list[Tensor]) -> list[Tensor]:
         pass
 
 
@@ -52,7 +49,7 @@ class HRNetV1(BaseBackbone):
         )
         self.stages = nn.ModuleList()
 
-    def forward_features(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def forward_features(self, x: Tensor) -> List[Tensor]:
         out = self.stem(x)
         return self.stages(out)
 
@@ -66,6 +63,6 @@ class HRNetV2(BaseBackbone):
         )
         self.stages = nn.ModuleList()
 
-    def forward_features(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def forward_features(self, x: Tensor) -> list[Tensor]:
         out = self.stem(x)
         return self.stages(out)

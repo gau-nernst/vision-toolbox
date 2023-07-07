@@ -1,8 +1,7 @@
 import warnings
-from typing import List
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torchvision.models import mobilenet, resnet
 
 
@@ -59,14 +58,14 @@ __all__ = [
 
 
 class _ExtractorBackbone(BaseBackbone):
-    def __init__(self, backbone: nn.Module, node_names: List[str]):
+    def __init__(self, backbone: nn.Module, node_names: list[str]):
         super().__init__()
         self.feat_extractor = create_feature_extractor(backbone, node_names)
         with torch.no_grad():
             self.out_channels_list = tuple(x.shape[1] for x in self.feat_extractor(torch.rand(1, 3, 224, 224)).values())
         self.stride = 32
 
-    def get_feature_maps(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def get_feature_maps(self, x: Tensor) -> list[Tensor]:
         return list(self.feat_extractor(x).values())
 
 
