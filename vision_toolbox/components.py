@@ -139,21 +139,16 @@ class DeformableConv2d(nn.Module):
 
 # add source. YOLO?
 class SPPBlock(nn.Module):
-    def __init__(self, kernel_size: int = 5, repeats: int = 3, pool_fn: str = "max"):
+    def __init__(self, kernel_size: int = 5, repeats: int = 3, pool: str = "max"):
         # https://github.com/ultralytics/yolov5/blob/master/models/common.py    see SPPF
         # equivalent to [5, 9, 13] max pooling
-        # any convolution here?
-        assert pool_fn in ("max", "avg")
         super().__init__()
-        pool_fn = nn.MaxPool2d if pool_fn == "max" else nn.AvgPool2d
-        padding = (kernel_size - 1) // 2
-        self.pool = pool_fn(kernel_size, stride=1, padding=padding)
+        self.pool = dict(avg=nn.AvgPool2d, max=nn.MaxPool2d)[pool](kernel_size, 1, (kernel_size - 1) // 2)
         self.repeats = repeats
 
     def forward(self, x: Tensor) -> Tensor:
         outputs = []
-        out = x
         for _ in range(self.repeats):
-            out = self.pool(out)
-            outputs.append(out)
+            x = self.pool(x)
+            outputs.append(x)
         return torch.cat(outputs, dim=1)
