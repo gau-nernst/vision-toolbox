@@ -146,7 +146,7 @@ configs = {
         **_base,
         num_blocks_list=(1, 2, 8, 8, 4),
         stage_cls=CSPDarknetStage,
-        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/cspdarknet53-f8225d3d.pth",
+        weights="https://github.com/gau-nernst/vision-toolbox/releases/download/v0.0.1/cspdarknet53-3bfa0423.pth",
     ),
     # from YOLOv5
     "darknet-yolov5n": dict(
