@@ -75,25 +75,6 @@ class SeparableConv2d(nn.Sequential):
         self.pw = ConvNormAct(in_channels, out_channels, kernel_size=1, padding=0, act_fn=act_fn)
 
 
-# https://arxiv.org/abs/1911.06667
-class ESEBlock(nn.Module):
-    def __init__(
-        self,
-        num_channels: int,
-        gate_fn: Callable[[], nn.Module] = partial(nn.Hardsigmoid, inplace=True),
-    ):
-        # author's code uses Hardsigmoid, although it is not mentioned in the paper
-        # https://github.com/youngwanLEE/vovnet-detectron2/blob/master/vovnet/vovnet.py
-        super().__init__()
-        self.linear = nn.Conv2d(num_channels, num_channels, 1)  # use conv so don't need to flatten output
-        self.gate = gate_fn()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = F.adaptive_avg_pool2d(x, (1, 1))
-        out = self.linear(out)
-        return x * self.gate(out)
-
-
 # https://arxiv.org/abs/1703.06211
 # https://arxiv.org/abs/1811.11168
 class DeformableConv2d(nn.Module):

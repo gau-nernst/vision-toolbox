@@ -2,12 +2,10 @@
 # VoVNetV1: https://arxiv.org/abs/1904.09730
 # VoVNetV2: https://arxiv.org/abs/1911.06667 (CenterMask)
 
-from typing import Iterable, Tuple
-
 import torch
-from torch import nn
+from torch import Tensor, nn
 
-from ..components import ConvNormAct, ESEBlock
+from ..components import ConvNormAct
 from .base import BaseBackbone
 
 
@@ -87,6 +85,17 @@ configs = {
 }
 
 
+class ESEBlock(nn.Module):
+    def __init__(self, num_channels: int) -> None:
+        super().__init__()
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.linear = nn.Conv2d(num_channels, num_channels, 1)
+        self.gate = nn.Hardsigmoid(inplace=True)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x * self.gate(self.linear(self.pool(x)))
+
+
 class OSABlock(nn.Module):
     def __init__(
         self,
@@ -96,7 +105,7 @@ class OSABlock(nn.Module):
         out_channels: int,
         residual: bool = True,
         ese: bool = True,
-    ):
+    ) -> None:
         super().__init__()
         self.convs = nn.ModuleList(
             [ConvNormAct(in_channels if i == 0 else mid_channels, mid_channels) for i in range(num_layers)]
@@ -107,7 +116,7 @@ class OSABlock(nn.Module):
         self.ese = ESEBlock(out_channels) if ese else None
         self.residual = residual and (in_channels == out_channels)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         outputs = []
         out = x
         outputs.append(out)
@@ -130,13 +139,13 @@ class VoVNet(BaseBackbone):
     def __init__(
         self,
         stem_channels: int,
-        num_blocks_list: Iterable[int],
-        stage_channels_list: Iterable[int],
-        num_layers_list: Iterable[int],
-        out_channels_list: Iterable[int],
+        num_blocks_list: list[int],
+        stage_channels_list: list[int],
+        num_layers_list: list[int],
+        out_channels_list: list[int],
         residual: bool = True,
         ese: bool = True,
-    ):
+    ) -> None:
         super().__init__()
         self.out_channels_list = (stem_channels,) + tuple(out_channels_list)
         self.stride = 32
@@ -160,7 +169,7 @@ class VoVNet(BaseBackbone):
                 in_c = out_c
             self.stages.append(stage)
 
-    def get_feature_maps(self, x):
+    def get_feature_maps(self, x: Tensor) -> list[Tensor]:
         outputs = [self.stem(x)]
         for s in self.stages:
             outputs.append(s(outputs[-1]))
