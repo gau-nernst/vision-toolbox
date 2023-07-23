@@ -45,15 +45,16 @@ class MHA(nn.Module):
         self.scale = (d_model // n_heads) ** (-0.5)
 
     def forward(self, x: Tensor) -> Tensor:
-        q, k, v = self.in_proj(x).chunk(3, -1)
+        qkv = self.in_proj(x)
+        q, k, v = qkv.unflatten(-1, (3, self.n_heads, -1)).transpose(-2, -4).unbind(-3)
+
         if hasattr(F, "scaled_dot_product_attention"):
-            q, k, v = map(lambda x: x.unflatten(-1, (self.n_heads, -1)).transpose(-2, -3), (q, k, v))
             out = F.scaled_dot_product_attention(q, k, v, dropout_p=self.dropout)
-            out = out.transpose(-2, -3).flatten(-2)
         else:
-            q, k, v = map(lambda x: x.unflatten(-1, (self.n_heads, -1)), (q, k, v))
-            out = torch.softmax(q @ (k * self.scale).transpose(-1, -2), -1) @ v
-            out = out.flatten(-2)
+            attn = torch.softmax(q @ (k * self.scale).transpose(-1, -2), -1)
+            out = F.dropout(attn, self.dropout, self.training) @ v
+
+        out = out.transpose(-2, -3).flatten(-2)
         out = self.out_proj(out)
         return out
 
