@@ -24,6 +24,44 @@ configs = dict(
 )
 
 
+class MHA(nn.Module):
+    def __init__(self, d_model: int, n_heads: int, bias: bool = True, dropout: float = 0.0) -> None:
+        super().__init__()
+        self.in_proj = nn.Linear(d_model, d_model * 3, bias)
+        self.out_proj = nn.Linear(d_model, d_model)
+        self.n_heads = n_heads
+        self.dropout = dropout
+
+    def forward(self, x: Tensor) -> Tensor:
+        q, k, v = self.in_proj(x).chunk(3, -1)
+        q, k, v = map(lambda x: x.unflatten(-1, (self.n_heads, -1)).transpose(-2, -3), (q, k, v))
+        out = F.scaled_dot_product_attention(q, k, v, dropout_p=self.dropout)
+        out = out.transpose(-2, -3).flatten(-2)
+        out = self.out_proj(out)
+        return out
+
+
+class TransformerEncoderLayer(nn.Module):
+    def __init__(
+        self, d_model: int, n_heads: int, bias: bool = True, dropout: float = 0.0, norm_eps: float = 1e-6
+    ) -> None:
+        super().__init__()
+        self.norm1 = nn.LayerNorm(d_model, norm_eps)
+        self.mha = MHA(d_model, n_heads, bias, dropout)
+        self.norm2 = nn.LayerNorm(d_model, norm_eps)
+        self.mlp = nn.Sequential(
+            nn.Linear(d_model, d_model * 4, bias),
+            nn.GELU(),
+            nn.Linear(d_model * 4, d_model, bias),
+            nn.Dropout(dropout),
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = x + self.mha(self.norm1(x))
+        x = x + self.mlp(self.norm2(x))
+        return x
+
+
 class ViT(nn.Module):
     def __init__(
         self,
@@ -32,8 +70,8 @@ class ViT(nn.Module):
         n_heads: int,
         patch_size: int,
         img_size: int,
-        mlp_dim: int | None = None,
         cls_token: bool = True,
+        bias: bool = True,
         dropout: float = 0.0,
         norm_eps: float = 1e-6,
     ) -> None:
@@ -47,9 +85,10 @@ class ViT(nn.Module):
         self.pe = nn.Parameter(torch.empty(1, pe_size, d_model))
         nn.init.normal_(self.pe, 0, 0.02)
 
-        mlp_dim = mlp_dim or d_model * 4
-        layer = nn.TransformerEncoderLayer(d_model, n_heads, mlp_dim, dropout, "gelu", norm_eps, True, True)
-        self.encoder = nn.TransformerEncoder(layer, n_layers, nn.LayerNorm(d_model, norm_eps))
+        self.layers = nn.Sequential()
+        for _ in range(n_layers):
+            self.layers.append(TransformerEncoderLayer(d_model, n_heads, bias, dropout))
+        self.norm = nn.LayerNorm(d_model, norm_eps)
 
     def forward(self, imgs: Tensor) -> Tensor:
         out = self.patch_embed(imgs)
@@ -57,7 +96,8 @@ class ViT(nn.Module):
         if self.cls_token is not None:
             out = torch.cat([self.cls_token.expand(out.shape[0], -1, -1), out], 1)
         out = out + self.pe
-        out = self.encoder(out)
+        out = self.layers(out)
+        out = self.norm(out)
         out = out[:, 0] if self.cls_token is not None else out.mean(1)
         return out
 
@@ -89,14 +129,6 @@ class ViT(nn.Module):
         def get_w(key: str) -> Tensor:
             return torch.from_numpy(jax_weights[key])
 
-        def copy_layernorm(module: nn.LayerNorm, prefix: str) -> None:
-            module.weight.copy_(get_w(prefix + "scale"))
-            module.bias.copy_(get_w(prefix + "bias"))
-
-        def copy_linear(module: nn.Linear, prefix: str) -> None:
-            module.weight.copy_(get_w(prefix + "kernel").T)
-            module.bias.copy_(get_w(prefix + "bias"))
-
         n_layers = 1
         while True:
             if f"Transformer/encoderblock_{n_layers}/LayerNorm_0/bias" not in jax_weights:
@@ -114,21 +146,27 @@ class ViT(nn.Module):
         m.patch_embed.weight.copy_(get_w("embedding/kernel").permute(3, 2, 0, 1))
         m.patch_embed.bias.copy_(get_w("embedding/bias"))
         m.pe.copy_(get_w("Transformer/posembed_input/pos_embedding"))
-        copy_layernorm(m.encoder.norm, "Transformer/encoder_norm/")
 
-        for idx, layer in enumerate(m.encoder.layers):
+        for idx, layer in enumerate(m.layers):
             prefix = f"Transformer/encoderblock_{idx}/"
-            copy_layernorm(layer.norm1, prefix + "LayerNorm_0/")
-            copy_layernorm(layer.norm2, prefix + "LayerNorm_2/")
-            copy_linear(layer.linear1, prefix + "MlpBlock_3/Dense_0/")
-            copy_linear(layer.linear2, prefix + "MlpBlock_3/Dense_1/")
-
             mha_prefix = prefix + "MultiHeadDotProductAttention_1/"
+
+            layer.norm1.weight.copy_(get_w(prefix + "LayerNorm_0/scale"))
+            layer.norm1.bias.copy_(get_w(prefix + "LayerNorm_0/bias"))
             w = torch.stack([get_w(mha_prefix + x + "/kernel") for x in ["query", "key", "value"]], 1)
             b = torch.stack([get_w(mha_prefix + x + "/bias") for x in ["query", "key", "value"]], 0)
-            layer.self_attn.in_proj_weight.copy_(w.flatten(1).T)
-            layer.self_attn.in_proj_bias.copy_(b.flatten())
-            layer.self_attn.out_proj.weight.copy_(get_w(mha_prefix + "out/kernel").flatten(0, 1).T)
-            layer.self_attn.out_proj.bias.copy_(get_w(mha_prefix + "out/bias"))
+            layer.mha.in_proj.weight.copy_(w.flatten(1).T)
+            layer.mha.in_proj.bias.copy_(b.flatten())
+            layer.mha.out_proj.weight.copy_(get_w(mha_prefix + "out/kernel").flatten(0, 1).T)
+            layer.mha.out_proj.bias.copy_(get_w(mha_prefix + "out/bias"))
 
+            layer.norm2.weight.copy_(get_w(prefix + "LayerNorm_2/scale"))
+            layer.norm2.bias.copy_(get_w(prefix + "LayerNorm_2/bias"))
+            layer.mlp[0].weight.copy_(get_w(prefix + "MlpBlock_3/Dense_0/kernel").T)
+            layer.mlp[0].bias.copy_(get_w(prefix + "MlpBlock_3/Dense_0/bias"))
+            layer.mlp[2].weight.copy_(get_w(prefix + "MlpBlock_3/Dense_1/kernel").T)
+            layer.mlp[2].bias.copy_(get_w(prefix + "MlpBlock_3/Dense_1/bias"))
+
+        m.norm.weight.copy_(get_w("Transformer/encoder_norm/scale"))
+        m.norm.bias.copy_(get_w("Transformer/encoder_norm/bias"))
         return m
