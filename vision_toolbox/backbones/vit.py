@@ -42,12 +42,18 @@ class MHA(nn.Module):
         self.out_proj = nn.Linear(d_model, d_model)
         self.n_heads = n_heads
         self.dropout = dropout
+        self.scale = (d_model // n_heads) ** (-0.5)
 
     def forward(self, x: Tensor) -> Tensor:
         q, k, v = self.in_proj(x).chunk(3, -1)
-        q, k, v = map(lambda x: x.unflatten(-1, (self.n_heads, -1)).transpose(-2, -3), (q, k, v))
-        out = F.scaled_dot_product_attention(q, k, v, dropout_p=self.dropout)
-        out = out.transpose(-2, -3).flatten(-2)
+        if hasattr(F, "scaled_dot_product_attention"):
+            q, k, v = map(lambda x: x.unflatten(-1, (self.n_heads, -1)).transpose(-2, -3), (q, k, v))
+            out = F.scaled_dot_product_attention(q, k, v, dropout_p=self.dropout)
+            out = out.transpose(-2, -3).flatten(-2)
+        else:
+            q, k, v = map(lambda x: x.unflatten(-1, (self.n_heads, -1)), (q, k, v))
+            out = torch.softmax(q @ (k * self.scale).transpose(-1, -2), -1) @ v
+            out = out.flatten(-2)
         out = self.out_proj(out)
         return out
 
@@ -132,7 +138,8 @@ class ViT(nn.Module):
         if pretrained:
             if (variant, patch_size) not in checkpoints:
                 raise ValueError(f"There is no pre-trained checkpoint for ViT-{variant}/{patch_size}")
-            m = ViT.from_jax_weights(torch_hub_download(checkpoints[(variant, patch_size)]))
+            url = "https://storage.googleapis.com/vit_models/augreg/" + checkpoints[(variant, patch_size)]
+            m = ViT.from_jax_weights(torch_hub_download(url))
             if img_size != 224:
                 m.resize_pe(img_size)
         else:

@@ -1,7 +1,7 @@
+import timm
 import torch
 
 from vision_toolbox.backbones import ViT
-from vision_toolbox.utils import torch_hub_download
 
 
 def test_resize_pe():
@@ -11,9 +11,12 @@ def test_resize_pe():
     m(torch.randn(1, 3, 256, 256))
 
 
-def test_from_jax():
-    url = (
-        "https://storage.googleapis.com/vit_models/augreg/Ti_16-i21k-300ep-lr_0.001-aug_none-wd_0.03-do_0.0-sd_0.0.npz"
-    )
-    m = ViT.from_jax_weights(torch_hub_download(url))
-    m(torch.randn(1, 3, 224, 224))
+def test_from_pretrained():
+    m = ViT.from_config("Ti", 16, 224, True).eval()
+    x = torch.randn(1, 3, 224, 224)
+    out = m(x)
+
+    m_timm = timm.create_model("vit_tiny_patch16_224.augreg_in21k", pretrained=True, num_classes=0).eval()
+    out_timm = m_timm(x)
+
+    torch.testing.assert_close(out, out_timm)
