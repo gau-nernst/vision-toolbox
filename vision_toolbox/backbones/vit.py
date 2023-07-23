@@ -2,10 +2,13 @@
 # https://arxiv.org/abs/2106.10270
 # https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_vit.py
 
+from __future__ import annotations
+
 from typing import Mapping
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch import Tensor, nn
 
 
@@ -33,7 +36,7 @@ class ViT(nn.Module):
         cls_token: bool = True,
         dropout: float = 0.0,
         norm_eps: float = 1e-6,
-    ):
+    ) -> None:
         super().__init__()
         self.patch_embed = nn.Conv2d(3, d_model, patch_size, patch_size)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, d_model)) if cls_token else None
@@ -58,13 +61,28 @@ class ViT(nn.Module):
         out = out[:, 0] if self.cls_token is not None else out.mean(1)
         return out
 
+    @torch.no_grad()
+    def resize_pe(self, size: int, interpolation_mode: str = "bicubic") -> None:
+        pe = self.pe if self.cls_token is None else self.pe[:, 1:]
+
+        old_size = int(pe.shape[1] ** 0.5)
+        new_size = size // self.patch_embed.weight.shape[2]
+        pe = pe.unflatten(1, (old_size, old_size)).permute(0, 3, 1, 2)
+        pe = F.interpolate(pe, (new_size, new_size), mode=interpolation_mode)
+        pe = pe.permute(0, 2, 3, 1).flatten(1, 2)
+
+        if self.cls_token is not None:
+            pe = torch.cat((self.pe[:, 0:1], pe), 1)
+
+        self.pe = nn.Parameter(pe)
+
     @staticmethod
-    def from_config(variant: str, patch_size: int, img_size: int) -> "ViT":
+    def from_config(variant: str, patch_size: int, img_size: int) -> ViT:
         return ViT(**configs[variant], patch_size=patch_size, img_size=img_size)
 
     # weights from https://github.com/google-research/vision_transformer
     @staticmethod
-    def from_jax_weights(path: str) -> "ViT":
+    def from_jax_weights(path: str) -> ViT:
         jax_weights: Mapping[str, np.ndarray] = np.load(path)
 
         n_layers = 1
