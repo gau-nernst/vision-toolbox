@@ -9,6 +9,7 @@ from vision_toolbox.backbones import (
     DarknetYOLOv5,
     EfficientNetExtractor,
     MobileNetExtractor,
+    PatchConvNet,
     RegNetExtractor,
     ResNetExtractor,
     VoVNet,
@@ -27,6 +28,7 @@ factory_list = [
         partial(VoVNet.from_config, x, y, z)
         for x, y, z in ((27, True, False), (39, False, False), (19, True, True), (57, False, True))
     ],
+    # partial(PatchConvNet.from_config, "S", 60),
     partial(ResNetExtractor, "resnet18"),
     partial(RegNetExtractor, "regnet_x_400mf"),
     partial(MobileNetExtractor, "mobilenet_v2"),
