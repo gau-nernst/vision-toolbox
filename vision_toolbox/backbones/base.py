@@ -1,10 +1,10 @@
-import warnings
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
-from copy import deepcopy
 from typing import Any
 
+import torch
 from torch import Tensor, nn
-from torch.hub import load_state_dict_from_url
 
 
 class BaseBackbone(nn.Module, metaclass=ABCMeta):
@@ -16,16 +16,11 @@ class BaseBackbone(nn.Module, metaclass=ABCMeta):
     def forward(self, x: Tensor) -> Tensor:
         return self.get_feature_maps(x)[-1]
 
-    @classmethod
-    def from_config(cls, config: dict[str, Any], pretrained: bool = False, **kwargs):
-        config = deepcopy(config)
-        weights = config.pop("weights", None)
-        model = cls(**config, **kwargs)
-        if pretrained:
-            if weights is not None:
-                state_dict = load_state_dict_from_url(weights)
-                model.load_state_dict(state_dict)
-            else:
-                msg = "No pre-trained weights are available. Skip loading pre-trained weights"
-                warnings.warn(msg)
-        return model
+    @staticmethod
+    @abstractmethod
+    def from_config(variant: str, pretrained: bool = False, **kwargs: Any) -> BaseBackbone:
+        pass
+
+    def _load_state_dict_from_url(self, url: str) -> None:
+        state_dict = torch.hub.load_state_dict_from_url(url)
+        self.load_state_dict(state_dict)

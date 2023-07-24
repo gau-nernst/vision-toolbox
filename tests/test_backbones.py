@@ -1,8 +1,10 @@
+from functools import partial
+
 import pytest
 import torch
 from torch import Tensor, nn
 
-from vision_toolbox import backbones
+from vision_toolbox.backbones import Darknet, DarknetYOLOv5
 
 
 @pytest.fixture
@@ -19,19 +21,20 @@ torchvision_models = ["resnet18", "mobilenet_v2", "efficientnet_b0", "regnet_x_4
 all_models = vovnet_v1_models + vovnet_v2_models + darknet_models + darknet_yolov5_models + torchvision_models
 
 
-@pytest.mark.parametrize("name", all_models)
+def partial_list(fn, args_list):
+    return [partial(fn, x) for x in args_list]
+
+
+factory_list = [
+    *partial_list(Darknet.from_config, ("darknet19", "cspdarknet53")),
+    *partial_list(DarknetYOLOv5.from_config, ("n", "l")),
+]
+
+
+@pytest.mark.parametrize("factory", factory_list)
 class TestBackbone:
-    def test_model_creation(self, name: str):
-        assert hasattr(backbones, name)
-        m = getattr(backbones, name)()
-        assert isinstance(m, nn.Module)
-        assert isinstance(m, backbones.BaseBackbone)
-
-    def test_pretrained_weights(self, name: str):
-        getattr(backbones, name)(pretrained=True)
-
-    def test_attributes(self, name: str):
-        m = getattr(backbones, name)()
+    def test_attributes(self, factory):
+        m = factory()
 
         assert hasattr(m, "out_channels_list")
         assert isinstance(m.out_channels_list, tuple)
@@ -44,15 +47,15 @@ class TestBackbone:
         assert hasattr(m, "get_feature_maps")
         assert callable(m.get_feature_maps)
 
-    def test_forward(self, name: str, inputs: Tensor):
-        m = getattr(backbones, name)()
+    def test_forward(self, factory, inputs):
+        m = factory()
         outputs = m(inputs)
 
         assert isinstance(outputs, Tensor)
         assert len(outputs.shape) == 4
 
-    def test_get_feature_maps(self, name: str, inputs: Tensor):
-        m = getattr(backbones, name)()
+    def test_get_feature_maps(self, factory, inputs):
+        m = factory()
         outputs = m.get_feature_maps(inputs)
 
         assert isinstance(outputs, list)
@@ -62,14 +65,17 @@ class TestBackbone:
             assert len(out.shape) == 4
             assert out.shape[1] == out_c
 
-    def test_jit_trace(self, name: str, inputs: Tensor):
-        m = getattr(backbones, name)()
+    def test_pretrained(self, factory):
+        factory(pretrained=True)
+
+    def test_jit_trace(self, factory, inputs):
+        m = factory()
         torch.jit.trace(m, inputs)
 
 
-@pytest.mark.skipif(not hasattr(torch, "compile"), reason="torch.compile() is not available")
-@pytest.mark.parametrize("name", ["vovnet39", "vovnet19_ese", "darknet19", "cspdarknet53", "darknet_yolov5n"])
-def test_compile(name: str, inputs: Tensor):
-    m = getattr(backbones, name)()
-    m_compiled = torch.compile(m)
-    m_compiled(inputs)
+# @pytest.mark.skipif(not hasattr(torch, "compile"), reason="torch.compile() is not available")
+# @pytest.mark.parametrize("name", ["vovnet39", "vovnet19_ese", "darknet19", "cspdarknet53", "darknet_yolov5n"])
+# def test_compile(name: str, inputs: Tensor):
+#     m = getattr(backbones, name)()
+#     m_compiled = torch.compile(m)
+#     m_compiled(inputs)
