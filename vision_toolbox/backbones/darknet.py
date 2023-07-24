@@ -28,6 +28,7 @@ class DarknetBlock(nn.Module):
 class DarknetStage(nn.Sequential):
     def __init__(self, n: int, in_channels: int, out_channels: int) -> None:
         super().__init__()
+        # TODO: use self.append() instead
         self.conv = ConvNormAct(in_channels, out_channels, stride=2)
         self.blocks = nn.Sequential(*[DarknetBlock(out_channels) for _ in range(n)])
 
@@ -46,12 +47,7 @@ class CSPDarknetStage(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         out = self.conv(x)
-
-        # using 2 convs is faster than using 1 conv then split
-        out1 = self.conv1(out)
-        out2 = self.conv2(out)
-        out2 = self.blocks(out2)
-        out = torch.cat((out1, out2), dim=1)
+        out = torch.cat([self.conv1(out), self.blocks(self.conv2(out))], dim=1)
         out = self.out_conv(out)
         return out
 
