@@ -104,7 +104,7 @@ class DarknetYOLOv5(BaseBackbone):
     def __init__(self, stem_channels: int, stage_configs: list[DarknetStageConfig | tuple[int, int]]) -> None:
         super().__init__()
         self.out_channels_list = (stem_channels,) + tuple(cfg[1] for cfg in stage_configs)
-        self.stride = 32
+        self.stride = 2 ** len(self.out_channels_list)
 
         self.stem = ConvNormAct(3, stem_channels, 6, 2)
         self.stages = nn.ModuleList()
@@ -125,7 +125,7 @@ class DarknetYOLOv5(BaseBackbone):
             n=(1 / 3, 1 / 4, "darknet_yolov5n-68f182f1.pth"),
             s=(1 / 3, 1 / 2, "darknet_yolov5s-175f7462.pth"),
             m=(2 / 3, 3 / 4, "darknet_yolov5m-9866aa40.pth"),
-            l=(1, 1, "darknet_yolov5l-8e25d388.pth"),
+            l=(1 / 1, 1 / 1, "darknet_yolov5l-8e25d388.pth"),
             x=(4 / 3, 5 / 4, "darknet_yolov5x-0ed0c035.pth"),
         )[variant]
         stage_configs = [

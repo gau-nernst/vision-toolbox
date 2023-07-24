@@ -4,7 +4,7 @@ import pytest
 import torch
 from torch import Tensor, nn
 
-from vision_toolbox.backbones import Darknet, DarknetYOLOv5
+from vision_toolbox.backbones import Darknet, DarknetYOLOv5, VoVNet
 
 
 @pytest.fixture
@@ -22,12 +22,13 @@ all_models = vovnet_v1_models + vovnet_v2_models + darknet_models + darknet_yolo
 
 
 def partial_list(fn, args_list):
-    return [partial(fn, x) for x in args_list]
+    return [partial(fn, *args) for args in args_list]
 
 
 factory_list = [
-    *partial_list(Darknet.from_config, ("darknet19", "cspdarknet53")),
-    *partial_list(DarknetYOLOv5.from_config, ("n", "l")),
+    *partial_list(Darknet.from_config, (("darknet19",), ("cspdarknet53",))),
+    *partial_list(DarknetYOLOv5.from_config, (("n",), ("l",))),
+    *partial_list(VoVNet.from_config, ((27, True), (39,), (19, True, True), (57, False, True))),
 ]
 
 
