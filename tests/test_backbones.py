@@ -2,9 +2,17 @@ from functools import partial
 
 import pytest
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 
-from vision_toolbox.backbones import Darknet, DarknetYOLOv5, VoVNet
+from vision_toolbox.backbones import (
+    Darknet,
+    DarknetYOLOv5,
+    EfficientNetExtractor,
+    MobileNetExtractor,
+    RegNetExtractor,
+    ResNetExtractor,
+    VoVNet,
+)
 
 
 @pytest.fixture
@@ -12,23 +20,17 @@ def inputs():
     return torch.rand(1, 3, 224, 224)
 
 
-vovnet_v1_models = [f"vovnet{x}" for x in ["27_slim", 39, 57]]
-vovnet_v2_models = [f"vovnet{x}_ese" for x in ["19_slim", 19, 39, 57, 99]]
-darknet_models = ["darknet19", "darknet53", "cspdarknet53"]
-darknet_yolov5_models = [f"darknet_yolov5{x}" for x in ("n", "s", "m", "l", "x")]
-torchvision_models = ["resnet18", "mobilenet_v2", "efficientnet_b0", "regnet_x_400mf"]
-
-all_models = vovnet_v1_models + vovnet_v2_models + darknet_models + darknet_yolov5_models + torchvision_models
-
-
-def partial_list(fn, args_list):
-    return [partial(fn, *args) for args in args_list]
-
-
 factory_list = [
-    *partial_list(Darknet.from_config, (("darknet19",), ("cspdarknet53",))),
-    *partial_list(DarknetYOLOv5.from_config, (("n",), ("l",))),
-    *partial_list(VoVNet.from_config, ((27, True), (39,), (19, True, True), (57, False, True))),
+    *[partial(Darknet.from_config, x) for x in ("darknet19", "cspdarknet53")],
+    *[partial(DarknetYOLOv5.from_config, x) for x in ("n", "l")],
+    *[
+        partial(VoVNet.from_config, x, y, z)
+        for x, y, z in ((27, True, False), (39, False, False), (19, True, True), (57, False, True))
+    ],
+    partial(ResNetExtractor, "resnet18"),
+    partial(RegNetExtractor, "regnet_x_400mf"),
+    partial(MobileNetExtractor, "mobilenet_v2"),
+    partial(EfficientNetExtractor, "efficientnet_b0"),
 ]
 
 
