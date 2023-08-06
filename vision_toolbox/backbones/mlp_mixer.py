@@ -1,4 +1,6 @@
-from torch import nn, Tensor
+# https://github.com/google-research/vision_transformer/blob/main/vit_jax/models_mixer.py
+
+from torch import Tensor, nn
 
 
 class MLP(nn.Sequential):
@@ -26,15 +28,23 @@ class MixerBlock(nn.Module):
 
 
 class MLPMixer(nn.Module):
-    def __init__(self, img_size: int, patch_size: int, d_model: int, n_layers: int, mlp_ratio: float) -> None:
+    def __init__(self, n_layers: int, d_model: int, patch_size: int, img_size: int, mlp_ratio: float = 4.0) -> None:
+        assert img_size % patch_size == 0
         super().__init__()
         self.patch_embed = nn.Conv2d(3, d_model, patch_size, patch_size)
         n_tokens = (img_size // patch_size) ** 2
         self.layers = nn.Sequential(*[MixerBlock(n_tokens, d_model, mlp_ratio) for _ in range(n_layers)])
         self.norm = nn.LayerNorm(d_model)
-    
+
     def forward(self, x: Tensor) -> Tensor:
         x = self.patch_embed(x).flatten(-2).transpose(-1, -2)
         x = self.layers(x)
         x = self.norm(x)
+        x = x.mean(-2)
         return x
+
+    @staticmethod
+    def from_config(variant: str, patch_size: int, img_size: int):
+        n_layers, d_model = dict(Ti=(12, 192), S=(12, 384), B=(12, 768), L=(24, 1024), H=(32, 1280))[variant]
+        m = MLPMixer(n_layers, d_model, patch_size, img_size)
+        return m

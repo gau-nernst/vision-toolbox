@@ -1,4 +1,5 @@
 from .darknet import Darknet, DarknetYOLOv5
+from .mlp_mixer import MLPMixer
 from .patchconvnet import PatchConvNet
 from .torchvision_models import EfficientNetExtractor, MobileNetExtractor, RegNetExtractor, ResNetExtractor
 from .vit import ViT
