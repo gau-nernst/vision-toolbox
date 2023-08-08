@@ -75,6 +75,7 @@ class MLPMixer(nn.Module):
         # Table 1 in https://arxiv.org/pdf/2105.01601.pdf
         n_layers, d_model = dict(S=(8, 512), B=(12, 768), L=(24, 1024), H=(32, 1280))[variant]
         m = MLPMixer(n_layers, d_model, patch_size, img_size)
+
         if pretrained:
             ckpt = {
                 ("S", 8): "gsam/Mixer-S_8.npz",
@@ -86,6 +87,7 @@ class MLPMixer(nn.Module):
             }[(variant, patch_size)]
             base_url = "https://storage.googleapis.com/mixer_models/"
             m.load_jax_weights(torch_hub_download(base_url + ckpt))
+
         return m
 
     @torch.no_grad()
