@@ -15,11 +15,11 @@ from .base import _act, _norm
 
 
 class MLP(nn.Sequential):
-    def __init__(self, d_model: int, mlp_dim: float, act: _act = nn.GELU) -> None:
+    def __init__(self, in_dim: int, hidden_dim: float, act: _act = nn.GELU) -> None:
         super().__init__()
-        self.linear1 = nn.Linear(d_model, mlp_dim)
+        self.linear1 = nn.Linear(in_dim, hidden_dim)
         self.act = act()
-        self.linear2 = nn.Linear(mlp_dim, d_model)
+        self.linear2 = nn.Linear(hidden_dim, in_dim)
 
 
 class MixerBlock(nn.Module):
