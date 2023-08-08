@@ -25,14 +25,16 @@ class MHA(nn.Module):
         self.dropout = dropout
         self.scale = (d_model // n_heads) ** (-0.5)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, attn_mask: Tensor | None = None) -> Tensor:
         qkv = self.in_proj(x)
         q, k, v = qkv.unflatten(-1, (3, self.n_heads, -1)).transpose(-2, -4).unbind(-3)
 
         if hasattr(F, "scaled_dot_product_attention"):
-            out = F.scaled_dot_product_attention(q, k, v, dropout_p=self.dropout)
+            out = F.scaled_dot_product_attention(q, k, v, attn_mask, self.dropout)
         else:
             attn = torch.softmax(q @ (k * self.scale).transpose(-1, -2), -1)
+            if attn_mask is not None:
+                attn = attn + attn_mask
             out = F.dropout(attn, self.dropout, self.training) @ v
 
         out = out.transpose(-2, -3).flatten(-2)
