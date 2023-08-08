@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Any
+from typing import Callable
 
 import torch
 from torch import Tensor, nn
+
+
+_norm = Callable[[int], nn.Module]
+_act = Callable[[], nn.Module]
 
 
 class BaseBackbone(nn.Module, metaclass=ABCMeta):
