@@ -20,7 +20,7 @@ class MHA(nn.Module):
     def __init__(self, d_model: int, n_heads: int, bias: bool = True, dropout: float = 0.0) -> None:
         super().__init__()
         self.in_proj = nn.Linear(d_model, d_model * 3, bias)
-        self.out_proj = nn.Linear(d_model, d_model)
+        self.out_proj = nn.Linear(d_model, d_model, bias)
         self.n_heads = n_heads
         self.dropout = dropout
         self.scale = (d_model // n_heads) ** (-0.5)
