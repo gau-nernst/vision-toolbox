@@ -12,14 +12,7 @@ from torch import Tensor, nn
 
 from ..utils import torch_hub_download
 from .base import _act, _norm
-
-
-class MLP(nn.Sequential):
-    def __init__(self, in_dim: int, hidden_dim: float, act: _act = nn.GELU) -> None:
-        super().__init__()
-        self.linear1 = nn.Linear(in_dim, hidden_dim)
-        self.act = act()
-        self.linear2 = nn.Linear(hidden_dim, in_dim)
+from .vit import MLP
 
 
 class MixerBlock(nn.Module):
