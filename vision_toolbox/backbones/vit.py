@@ -28,14 +28,13 @@ class MHA(nn.Module):
     def forward(self, x: Tensor, attn_bias: Tensor | None = None) -> Tensor:
         qkv = self.in_proj(x)
         q, k, v = qkv.unflatten(-1, (3, self.n_heads, -1)).transpose(-2, -4).unbind(-3)
-
         if hasattr(F, "scaled_dot_product_attention"):
             out = F.scaled_dot_product_attention(q, k, v, attn_bias, self.dropout if self.training else 0.0)
         else:
-            attn = torch.softmax(q @ (k * self.scale).transpose(-1, -2), -1)
+            attn = q @ (k * self.scale).transpose(-1, -2)
             if attn_bias is not None:
                 attn = attn + attn_bias
-            out = F.dropout(attn, self.dropout, self.training) @ v
+            out = F.dropout(torch.softmax(attn, -1), self.dropout, self.training) @ v
 
         out = out.transpose(-2, -3).flatten(-2)
         out = self.out_proj(out)
