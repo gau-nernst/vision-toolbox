@@ -43,11 +43,12 @@ class MHA(nn.Module):
 
 
 class MLP(nn.Sequential):
-    def __init__(self, in_dim: int, hidden_dim: float, act: _act = nn.GELU) -> None:
+    def __init__(self, in_dim: int, hidden_dim: float, dropout: float = 0.0, act: _act = nn.GELU) -> None:
         super().__init__()
         self.linear1 = nn.Linear(in_dim, hidden_dim)
         self.act = act()
         self.linear2 = nn.Linear(hidden_dim, in_dim)
+        self.dropout = nn.Dropout(dropout)
 
 
 class ViTBlock(nn.Module):
@@ -65,7 +66,7 @@ class ViTBlock(nn.Module):
         self.norm1 = norm(d_model)
         self.mha = MHA(d_model, n_heads, bias, dropout)
         self.norm2 = norm(d_model)
-        self.mlp = MLP(d_model, int(d_model * mlp_ratio), act)
+        self.mlp = MLP(d_model, int(d_model * mlp_ratio), dropout, act)
 
     def forward(self, x: Tensor) -> Tensor:
         x = x + self.mha(self.norm1(x))
