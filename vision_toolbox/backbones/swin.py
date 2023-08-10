@@ -153,16 +153,15 @@ class SwinTransformer(nn.Module):
         self.stages = nn.Sequential()
         for i, (depth, window_size) in enumerate(zip(depths, window_sizes)):
             stage = nn.Sequential()
-            for i in range(depth):
-                blk = SwinBlock(input_size, d_model, n_heads, window_size, i % 2, mlp_ratio, bias, dropout, norm, act)
-                stage.append(blk)
-
-            if i < len(depths) - 1:
+            if i > 0:
                 stage.append(PatchMerging(d_model, norm))
                 input_size //= 2
                 d_model *= 2
                 n_heads *= 2
 
+            for i in range(depth):
+                blk = SwinBlock(input_size, d_model, n_heads, window_size, i % 2, mlp_ratio, bias, dropout, norm, act)
+                stage.append(blk)
             self.stages.append(stage)
 
         self.head_norm = norm(d_model)
