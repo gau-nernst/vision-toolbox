@@ -166,11 +166,14 @@ class SwinTransformer(nn.Module):
 
         self.head_norm = norm(d_model)
 
+    def get_feature_maps(self, x: Tensor) -> list[Tensor]:
+        out = [self.dropout(self.norm(self.patch_embed(x).permute(0, 2, 3, 1)))]
+        for stage in self.stages:
+            out.append(stage(out[-1]))
+        return out[1:]
+
     def forward(self, x: Tensor) -> Tensor:
-        x = self.dropout(self.norm(self.patch_embed(x).permute(0, 2, 3, 1)))
-        x = self.stages(x)
-        x = self.head_norm(x).mean((1, 2))
-        return x
+        return self.head_norm(self.get_feature_maps(x)[-1]).mean((1, 2))
 
     @staticmethod
     def from_config(variant: str, img_size: int, pretrained: bool = False) -> SwinTransformer:
