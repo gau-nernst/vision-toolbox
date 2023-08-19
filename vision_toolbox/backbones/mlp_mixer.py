@@ -12,14 +12,7 @@ from torch import Tensor, nn
 
 from ..utils import torch_hub_download
 from .base import _act, _norm
-
-
-class MLP(nn.Sequential):
-    def __init__(self, in_dim: int, hidden_dim: float, act: _act = nn.GELU) -> None:
-        super().__init__()
-        self.linear1 = nn.Linear(in_dim, hidden_dim)
-        self.act = act()
-        self.linear2 = nn.Linear(hidden_dim, in_dim)
+from .vit import MLP
 
 
 class MixerBlock(nn.Module):
@@ -28,15 +21,16 @@ class MixerBlock(nn.Module):
         n_tokens: int,
         d_model: int,
         mlp_ratio: tuple[int, int] = (0.5, 4.0),
+        dropout: float = 0.0,
         norm: _norm = partial(nn.LayerNorm, eps=1e-6),
         act: _act = nn.GELU,
     ) -> None:
         tokens_mlp_dim, channels_mlp_dim = [int(d_model * ratio) for ratio in mlp_ratio]
         super().__init__()
         self.norm1 = norm(d_model)
-        self.token_mixing = MLP(n_tokens, tokens_mlp_dim, act)
+        self.token_mixing = MLP(n_tokens, tokens_mlp_dim, dropout, act)
         self.norm2 = norm(d_model)
-        self.channel_mixing = MLP(d_model, channels_mlp_dim, act)
+        self.channel_mixing = MLP(d_model, channels_mlp_dim, dropout, act)
 
     def forward(self, x: Tensor) -> Tensor:
         # x -> (B, n_tokens, d_model)
@@ -53,6 +47,7 @@ class MLPMixer(nn.Module):
         patch_size: int,
         img_size: int,
         mlp_ratio: tuple[float, float] = (0.5, 4.0),
+        dropout: float = 0.0,
         norm: _norm = partial(nn.LayerNorm, eps=1e-6),
         act: _act = nn.GELU,
     ) -> None:
@@ -60,7 +55,9 @@ class MLPMixer(nn.Module):
         super().__init__()
         self.patch_embed = nn.Conv2d(3, d_model, patch_size, patch_size)
         n_tokens = (img_size // patch_size) ** 2
-        self.layers = nn.Sequential(*[MixerBlock(n_tokens, d_model, mlp_ratio, norm, act) for _ in range(n_layers)])
+        self.layers = nn.Sequential(
+            *[MixerBlock(n_tokens, d_model, mlp_ratio, dropout, norm, act) for _ in range(n_layers)]
+        )
         self.norm = norm(d_model)
 
     def forward(self, x: Tensor) -> Tensor:
