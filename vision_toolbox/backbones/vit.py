@@ -27,7 +27,7 @@ class MHA(nn.Module):
 
     def forward(self, x: Tensor, attn_bias: Tensor | None = None) -> Tensor:
         qkv = self.in_proj(x)
-        q, k, v = qkv.unflatten(-1, (3, self.n_heads, -1)).transpose(-2, -4).unbind(-3)
+        q, k, v = qkv.unflatten(-1, (3, self.n_heads, -1)).transpose(-2, -4).unbind(-3)  # (B, n_heads, L, head_dim)
         if hasattr(F, "scaled_dot_product_attention"):
             out = F.scaled_dot_product_attention(q, k, v, attn_bias, self.dropout if self.training else 0.0)
         else:

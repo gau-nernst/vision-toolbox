@@ -49,11 +49,11 @@ class WindowAttention(MHA):
             img_mask = torch.zeros(1, input_size, input_size, 1)
             slices = (slice(0, -window_size), slice(-window_size, -self.shift), slice(-self.shift, None))
             for i, (h_slice, w_slice) in enumerate(itertools.product(slices, slices)):
-                img_mask[0, h_slice, w_slice, 0] = i
+                img_mask[:, h_slice, w_slice, :] = i
 
             windows_mask, _, _ = window_partition(img_mask, window_size)  # (nH * nW, win_size * win_size, 1)
-            attn_mask = windows_mask - windows_mask.transpose(1, 2)
-            self.register_buffer("attn_mask", (attn_mask != 0).unsqueeze(1) * (-100), False)
+            attn_mask = windows_mask.transpose(1, 2) - windows_mask
+            self.register_buffer("attn_mask", (attn_mask != 0) * (-100.0), False)
             self.attn_mask: Tensor
 
         else:
@@ -74,11 +74,11 @@ class WindowAttention(MHA):
         attn_bias = self.relative_pe_table[..., self.relative_pe_index]
         if self.shift > 0:
             x = x.roll((-self.shift, -self.shift), (1, 2))
-            attn_bias = attn_bias + self.attn_mask
+            attn_bias = attn_bias + self.attn_mask.unsqueeze(1)  # add n_heads dim
 
         x, nH, nW = window_partition(x, self.window_size)  # (B * nH * nW, win_size * win_size, C)
         x = super().forward(x, attn_bias)
-        x = window_unpartition(x, self.window_size, nH, nW)
+        x = window_unpartition(x, self.window_size, nH, nW)  # (B, H, W, C)
 
         if self.shift > 0:
             x = x.roll((self.shift, self.shift), (1, 2))
@@ -159,11 +159,13 @@ class SwinTransformer(BaseBackbone):
                 n_heads *= 2
             else:
                 downsample = nn.Identity()
-            stage.add_module("downsample", downsample)
+            stage.append(downsample)
 
             for i in range(depth):
-                blk = SwinBlock(input_size, d_model, n_heads, window_size, i % 2, mlp_ratio, bias, dropout, norm, act)
-                stage.add_module(f"block_{i}", blk)
+                shift = (i % 2) and input_size > window_size
+                block = SwinBlock(input_size, d_model, n_heads, window_size, shift, mlp_ratio, bias, dropout, norm, act)
+                stage.append(block)
+
             self.stages.append(stage)
 
         self.head_norm = norm(d_model)
@@ -210,27 +212,36 @@ class SwinTransformer(BaseBackbone):
     @torch.no_grad()
     def load_official_ckpt(self, state_dict: dict[str, Tensor]) -> None:
         def copy_(m: nn.Linear | nn.LayerNorm, prefix: str) -> None:
-            m.weight.copy_(state_dict[prefix + ".weight"])
-            m.bias.copy_(state_dict[prefix + ".bias"])
+            m.weight.copy_(state_dict.pop(prefix + ".weight"))
+            if m.bias is not None:
+                m.bias.copy_(state_dict.pop(prefix + ".bias"))
 
         copy_(self.patch_embed, "patch_embed.proj")
         copy_(self.norm, "patch_embed.norm")
 
-        for stage_i, stage in enumerate(self.stages):
-            if stage_i > 0:
-                stage.downsample.reduction.weight.copy_(state_dict[f"layers.{stage_i-1}.downsample.reduction.weight"])
+        for stage_idx, stage in enumerate(self.stages):
+            if stage_idx > 0:
+                prefix = f"layers.{stage_idx-1}.downsample."
+                copy_(stage[0].norm, prefix + "norm")
+                copy_(stage[0].reduction, prefix + "reduction")
 
-            for block_idx in range(len(stage) - 1):
-                block: SwinBlock = getattr(stage, f"block_{block_idx}")
-                prefix = f"layers.{stage_i}.blocks.{block_idx}."
+            for block_idx in range(1, len(stage)):
+                block: SwinBlock = stage[block_idx]
+                prefix = f"layers.{stage_idx}.blocks.{block_idx - 1}."
                 block_idx += 1
 
+                if block.mha.attn_mask is not None:
+                    torch.testing.assert_close(block.mha.attn_mask, state_dict.pop(prefix + "attn_mask"))
+                torch.testing.assert_close(
+                    block.mha.relative_pe_index, state_dict.pop(prefix + "attn.relative_position_index")
+                )
                 copy_(block.norm1, prefix + "norm1")
                 copy_(block.mha.in_proj, prefix + "attn.qkv")
                 copy_(block.mha.out_proj, prefix + "attn.proj")
-                block.mha.relative_pe_table.copy_(state_dict[prefix + "attn.relative_position_bias_table"].T)
+                block.mha.relative_pe_table.copy_(state_dict.pop(prefix + "attn.relative_position_bias_table").T)
                 copy_(block.norm2, prefix + "norm2")
                 copy_(block.mlp.linear1, prefix + "mlp.fc1")
                 copy_(block.mlp.linear2, prefix + "mlp.fc2")
 
         copy_(self.head_norm, "norm")
+        assert len(state_dict) == 2  # head.weight and head.bias
