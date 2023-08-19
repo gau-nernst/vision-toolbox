@@ -100,6 +100,43 @@ class ConvNeXt(BaseBackbone):
         m = ConvNeXt(d_model, depths)
 
         if pretrained:
-            pass
+            # TODO: also add torchvision checkpoints?
+            ckpt = dict(
+                T="convnext_tiny_22k_224.pth",
+                S="convnext_small_22k_224.pth",
+                B="convnext_base_22k_224.pth",
+                L="convnext_large_22k_224.pth",
+                XL="convnext_xlarge_22k_224.pth",
+            )[variant]
+            base_url = "https://dl.fbaipublicfiles.com/convnext/"
+            state_dict = torch.hub.load_state_dict_from_url(base_url + ckpt)["model"]
+            m.load_official_ckpt(state_dict)
 
         return m
+
+    @torch.no_grad()
+    def load_official_ckpt(self, state_dict: dict[str, Tensor]) -> None:
+        def copy_(m: nn.Conv2d | nn.Linear | nn.LayerNorm, prefix: str):
+            m.weight.copy_(state_dict.pop(prefix + ".weight"))
+            m.bias.copy_(state_dict.pop(prefix + ".bias"))
+
+        copy_(self.stem[0], "downsample_layers.0.0")  # Conv2d
+        copy_(self.stem[2], "downsample_layers.0.1")  # LayerNorm
+
+        for stage_idx, stage in enumerate(self.stages):
+            if stage_idx > 0:
+                copy_(stage[0][0], f"downsample_layers.{stage_idx}.0")  # LayerNorm
+                copy_(stage[0][2], f"downsample_layers.{stage_idx}.1")  # Conv2d
+
+            for block_idx in range(1, len(stage)):
+                block: ConvNeXtBlock = stage[block_idx]
+                prefix = f"stages.{stage_idx}.{block_idx - 1}."
+
+                copy_(block.layers[1], prefix + "dwconv")
+                copy_(block.layers[3], prefix + "norm")
+                copy_(block.layers[4], prefix + "pwconv1")
+                copy_(block.layers[6], prefix + "pwconv2")
+                block.layer_scale.copy_(state_dict.pop(prefix + "gamma"))
+
+        copy_(self.head_norm, "norm")
+        assert len(state_dict) == 2

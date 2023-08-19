@@ -9,12 +9,12 @@ def test_forward():
     m(torch.randn(1, 3, 224, 224))
 
 
-# def test_from_pretrained():
-#     m = ViT.from_config("Ti", 16, 224, True).eval()
-#     x = torch.randn(1, 3, 224, 224)
-#     out = m(x)
+def test_from_pretrained():
+    m = ConvNeXt.from_config("T", True).eval()
+    x = torch.randn(1, 3, 224, 224)
+    out = m(x)
 
-#     m_timm = timm.create_model("vit_tiny_patch16_224.augreg_in21k", pretrained=True, num_classes=0).eval()
-#     out_timm = m_timm(x)
+    m_timm = timm.create_model("convnext_tiny.fb_in22k", pretrained=True, num_classes=0).eval()
+    out_timm = m_timm(x)
 
-#     torch.testing.assert_close(out, out_timm, rtol=2e-5, atol=2e-5)
+    torch.testing.assert_close(out, out_timm)
