@@ -1,4 +1,5 @@
 # https://arxiv.org/abs/2201.03545
+# https://github.com/facebookresearch/ConvNeXt
 
 from __future__ import annotations
 
