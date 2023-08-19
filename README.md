@@ -177,25 +177,6 @@ VoVNet-99-ese      | 80.7      | 69.52      | 34.51     | large, batch_size=512
 
 *FLOPS is measured with `(1,3,224,224)` input.
 
-### PatchConvNet
-
-Paper: [[PatchConvNet]](https://arxiv.org/abs/2112.13692)
-
-- S{60,120}: embedding dim 384
-- B{60,120}: embedding dim 768
-- L{60,120}: embedding dim 1024
-
-Backbone | Top-1 acc | #Params(M) | FLOPS(G)* | Train recipe
----------|-----------|------------|-----------|--------------
-S60      |           |            |           | default
-S120     |           |            |           | default
-B60      |           |            |           | default
-B120     |           |            |           | default
-L60      |           |            |           | default
-L120     |           |            |           | default
-
-Note: It is unlikely that I will have the resources to train these models.
-
 ### torchvision
 
 Some torchvision classification models are ported to use with the toolbox. They can output multiple feature map levels. `torchvision>=0.11.0` is required since its feature extraction API is used to do this.
