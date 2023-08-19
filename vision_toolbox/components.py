@@ -150,3 +150,31 @@ class SPPBlock(nn.Module):
             x = self.pool(x)
             outputs.append(x)
         return torch.cat(outputs, dim=1)
+
+
+class Permute(nn.Module):
+    def __init__(self, *dims: int) -> None:
+        super().__init__()
+        self.dims = dims
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x.permute(self.dims)
+
+
+# https://arxiv.org/pdf/1603.09382.pdf
+class StochasticDepth(nn.Module):
+    def __init__(self, p: float) -> None:
+        assert 0.0 <= p <= 1.0
+        super().__init__()
+        self.p = p
+
+    def forward(self, x: Tensor) -> Tensor:
+        if not self.training or self.p == 0.0:
+            return x
+
+        shape = [x.shape[0]] + [1] * (x.ndim - 1)
+        keep_p = 1.0 - self.p
+        return x * x.new_empty(shape).bernoulli_(keep_p).div_(keep_p)
+
+    def extra_repr(self) -> str:
+        return f"p={self.p}"
