@@ -5,13 +5,11 @@
 
 from __future__ import annotations
 
-from functools import partial
-
 import torch
 from torch import Tensor, nn
 
 from ..components import LayerScale, Permute, StochasticDepth
-from .base import BaseBackbone, _act, _norm
+from .base import BaseBackbone
 
 
 class GlobalResponseNorm(nn.Module):
@@ -36,8 +34,7 @@ class ConvNeXtBlock(nn.Module):
         bias: bool = True,
         layer_scale_init: float | None = 1e-6,
         stochastic_depth: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
         v2: bool = False,
     ) -> None:
         if v2:
@@ -48,9 +45,9 @@ class ConvNeXtBlock(nn.Module):
             Permute(0, 3, 1, 2),
             nn.Conv2d(d_model, d_model, 7, padding=3, groups=d_model, bias=bias),
             Permute(0, 2, 3, 1),
-            norm(d_model),
+            nn.LayerNorm(d_model, norm_eps),
             nn.Linear(d_model, hidden_dim, bias=bias),
-            act(),
+            nn.GELU(),
             GlobalResponseNorm(hidden_dim) if v2 else nn.Identity(),
             nn.Linear(hidden_dim, d_model, bias=bias),
             LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
@@ -70,12 +67,11 @@ class ConvNeXt(BaseBackbone):
         bias: bool = True,
         layer_scale_init: float | None = 1e-6,
         stochastic_depth: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
         v2: bool = False,
     ) -> None:
         super().__init__()
-        self.stem = nn.Sequential(nn.Conv2d(3, d_model, 4, 4), Permute(0, 2, 3, 1), norm(d_model))
+        self.stem = nn.Sequential(nn.Conv2d(3, d_model, 4, 4), Permute(0, 2, 3, 1), nn.LayerNorm(d_model, norm_eps))
 
         stochastic_depth_rates = torch.linspace(0, stochastic_depth, sum(depths))
         self.stages = nn.Sequential()
@@ -85,7 +81,7 @@ class ConvNeXt(BaseBackbone):
             if stage_idx > 0:
                 # equivalent to PatchMerging in SwinTransformer
                 downsample = nn.Sequential(
-                    norm(d_model),
+                    nn.LayerNorm(d_model, norm_eps),
                     Permute(0, 3, 1, 2),
                     nn.Conv2d(d_model, d_model * 2, 2, 2),
                     Permute(0, 2, 3, 1),
@@ -97,12 +93,12 @@ class ConvNeXt(BaseBackbone):
 
             for block_idx in range(depth):
                 rate = stochastic_depth_rates[sum(depths[:stage_idx]) + block_idx]
-                block = ConvNeXtBlock(d_model, expansion_ratio, bias, layer_scale_init, rate, norm, act, v2)
+                block = ConvNeXtBlock(d_model, expansion_ratio, bias, layer_scale_init, rate, norm_eps, v2)
                 stage.append(block)
 
             self.stages.append(stage)
 
-        self.head_norm = norm(d_model)
+        self.norm = nn.LayerNorm(d_model, norm_eps)
 
     def get_feature_maps(self, x: Tensor) -> list[Tensor]:
         out = [self.stem(x)]
@@ -111,7 +107,7 @@ class ConvNeXt(BaseBackbone):
         return out[-1:]
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.head_norm(self.get_feature_maps(x)[-1].mean((1, 2)))
+        return self.norm(self.get_feature_maps(x)[-1].mean((1, 2)))
 
     @staticmethod
     def from_config(variant: str, v2: bool = False, pretrained: bool = False) -> ConvNeXt:
@@ -189,7 +185,7 @@ class ConvNeXt(BaseBackbone):
 
         # FCMAE checkpoints don't contain head norm
         if "norm.weight" in state_dict:
-            copy_(self.head_norm, "norm")
+            copy_(self.norm, "norm")
             assert len(state_dict) == 2
         else:
             assert len(state_dict) == 0

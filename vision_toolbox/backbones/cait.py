@@ -9,7 +9,6 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from .base import _act, _norm
 from .vit import MHA, ViT, ViTBlock
 
 
@@ -62,13 +61,12 @@ class CaiTCABlock(ViTBlock):
         dropout: float = 0.0,
         layer_scale_init: float | None = 1e-6,
         stochastic_depth: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
     ) -> None:
         # fmt: off
         super().__init__(
             d_model, n_heads, bias, mlp_ratio, dropout,
-            layer_scale_init, stochastic_depth, norm, act,
+            layer_scale_init, stochastic_depth, norm_eps,
             partial(ClassAttention, d_model, n_heads, bias, dropout),
         )
         # fmt: on
@@ -89,13 +87,12 @@ class CaiTSABlock(ViTBlock):
         dropout: float = 0.0,
         layer_scale_init: float | None = 1e-6,
         stochastic_depth: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
     ) -> None:
         # fmt: off
         super().__init__(
             d_model, n_heads, bias, mlp_ratio, dropout,
-            layer_scale_init, stochastic_depth, norm, act,
+            layer_scale_init, stochastic_depth, norm_eps,
             partial(TalkingHeadAttention, d_model, n_heads, bias, dropout),
         )
         # fmt: on
@@ -115,8 +112,7 @@ class CaiT(nn.Module):
         dropout: float = 0.0,
         layer_scale_init: float | None = 1e-6,
         stochastic_depth: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
     ) -> None:
         assert img_size % patch_size == 0
         super().__init__()
@@ -127,19 +123,15 @@ class CaiT(nn.Module):
 
         self.sa_layers = nn.Sequential()
         for _ in range(sa_depth):
-            block = CaiTSABlock(
-                d_model, n_heads, bias, mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm, act
-            )
-            self.sa_layers.append(block)
+            blk = CaiTSABlock(d_model, n_heads, bias, mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm_eps)
+            self.sa_layers.append(blk)
 
         self.ca_layers = nn.ModuleList()
         for _ in range(ca_depth):
-            block = CaiTCABlock(
-                d_model, n_heads, bias, mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm, act
-            )
-            self.ca_layers.append(block)
+            blk = CaiTCABlock(d_model, n_heads, bias, mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm_eps)
+            self.ca_layers.append(blk)
 
-        self.norm = norm(d_model)
+        self.norm = nn.LayerNorm(d_model, norm_eps)
 
     def forward(self, imgs: Tensor) -> Tensor:
         patches = self.patch_embed(imgs).flatten(2).transpose(1, 2)  # (N, C, H, W) -> (N, H*W, C)

@@ -14,7 +14,6 @@ from torch import Tensor, nn
 
 from ..components import LayerScale, StochasticDepth
 from ..utils import torch_hub_download
-from .base import _act, _norm
 
 
 class MHA(nn.Module):
@@ -47,10 +46,10 @@ class MHA(nn.Module):
 
 
 class MLP(nn.Sequential):
-    def __init__(self, in_dim: int, hidden_dim: float, dropout: float = 0.0, act: _act = nn.GELU) -> None:
+    def __init__(self, in_dim: int, hidden_dim: float, dropout: float = 0.0) -> None:
         super().__init__()
         self.linear1 = nn.Linear(in_dim, hidden_dim)
-        self.act = act()
+        self.act = nn.GELU()
         self.linear2 = nn.Linear(hidden_dim, in_dim)
         self.dropout = nn.Dropout(dropout)
 
@@ -65,22 +64,21 @@ class ViTBlock(nn.Module):
         dropout: float = 0.0,
         layer_scale_init: float | None = None,
         stochastic_depth: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
         attention: type[nn.Module] | None = None,
     ) -> None:
         if attention is None:
             attention = partial(MHA, d_model, n_heads, bias, dropout)
         super().__init__()
         self.mha = nn.Sequential(
-            norm(d_model),
+            nn.LayerNorm(d_model, norm_eps),
             attention(),
             LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
             StochasticDepth(stochastic_depth),
         )
         self.mlp = nn.Sequential(
-            norm(d_model),
-            MLP(d_model, int(d_model * mlp_ratio), dropout, act),
+            nn.LayerNorm(d_model, norm_eps),
+            MLP(d_model, int(d_model * mlp_ratio), dropout),
             LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
             StochasticDepth(stochastic_depth),
         )
@@ -105,8 +103,7 @@ class ViT(nn.Module):
         dropout: float = 0.0,
         layer_scale_init: float | None = None,
         stochastic_depth: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
     ) -> None:
         assert img_size % patch_size == 0
         super().__init__()
@@ -117,10 +114,10 @@ class ViT(nn.Module):
 
         self.layers = nn.Sequential()
         for _ in range(depth):
-            block = ViTBlock(d_model, n_heads, bias, mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm, act)
+            block = ViTBlock(d_model, n_heads, bias, mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm_eps)
             self.layers.append(block)
 
-        self.norm = norm(d_model)
+        self.norm = nn.LayerNorm(d_model, norm_eps)
 
     def forward(self, imgs: Tensor) -> Tensor:
         out = self.patch_embed(imgs).flatten(2).transpose(1, 2) + self.pe  # (N, C, H, W) -> (N, H*W, C)
