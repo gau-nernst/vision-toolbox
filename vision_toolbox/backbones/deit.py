@@ -4,13 +4,10 @@
 
 from __future__ import annotations
 
-from functools import partial
-
 import torch
 from torch import Tensor, nn
 
 from ..components import LayerScale
-from .base import _act, _norm
 from .vit import ViT, ViTBlock
 
 
@@ -27,13 +24,12 @@ class DeiT(ViT):
         dropout: float = 0.0,
         layer_scale_init: float | None = None,
         stochastic_depth: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
     ) -> None:
         # fmt: off
         super().__init__(
             d_model, depth, n_heads, patch_size, img_size, True, bias, mlp_ratio,
-            dropout, layer_scale_init, stochastic_depth, norm, act
+            dropout, layer_scale_init, stochastic_depth, norm_eps
         )
         # fmt: on
         self.dist_token = nn.Parameter(torch.zeros(1, 1, d_model))
@@ -133,13 +129,12 @@ class DeiT3(ViT):
         dropout: float = 0.0,
         layer_scale_init: float | None = 1e-6,
         stochastic_depth: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
     ):
         # fmt: off
         super().__init__(
             d_model, depth, n_heads, patch_size, img_size, cls_token, bias,
-            mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm, act
+            mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm_eps,
         )
         # fmt: on
 

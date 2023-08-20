@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Mapping
 
 import numpy as np
@@ -11,7 +10,6 @@ import torch
 from torch import Tensor, nn
 
 from ..utils import torch_hub_download
-from .base import _act, _norm
 from .vit import MLP
 
 
@@ -22,15 +20,14 @@ class MixerBlock(nn.Module):
         d_model: int,
         mlp_ratio: tuple[int, int] = (0.5, 4.0),
         dropout: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
     ) -> None:
         tokens_mlp_dim, channels_mlp_dim = [int(d_model * ratio) for ratio in mlp_ratio]
         super().__init__()
-        self.norm1 = norm(d_model)
-        self.token_mixing = MLP(n_tokens, tokens_mlp_dim, dropout, act)
-        self.norm2 = norm(d_model)
-        self.channel_mixing = MLP(d_model, channels_mlp_dim, dropout, act)
+        self.norm1 = nn.LayerNorm(d_model, norm_eps)
+        self.token_mixing = MLP(n_tokens, tokens_mlp_dim, dropout)
+        self.norm2 = nn.LayerNorm(d_model, norm_eps)
+        self.channel_mixing = MLP(d_model, channels_mlp_dim, dropout)
 
     def forward(self, x: Tensor) -> Tensor:
         # x -> (B, n_tokens, d_model)
@@ -48,17 +45,16 @@ class MLPMixer(nn.Module):
         img_size: int,
         mlp_ratio: tuple[float, float] = (0.5, 4.0),
         dropout: float = 0.0,
-        norm: _norm = partial(nn.LayerNorm, eps=1e-6),
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-6,
     ) -> None:
         assert img_size % patch_size == 0
         super().__init__()
         self.patch_embed = nn.Conv2d(3, d_model, patch_size, patch_size)
         n_tokens = (img_size // patch_size) ** 2
         self.layers = nn.Sequential(
-            *[MixerBlock(n_tokens, d_model, mlp_ratio, dropout, norm, act) for _ in range(n_layers)]
+            *[MixerBlock(n_tokens, d_model, mlp_ratio, dropout, norm_eps) for _ in range(n_layers)]
         )
-        self.norm = norm(d_model)
+        self.norm = nn.LayerNorm(d_model, norm_eps)
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.patch_embed(x).flatten(2).transpose(1, 2)  # (N, C, H, W) -> (N, H*W, C)

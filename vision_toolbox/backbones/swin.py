@@ -9,7 +9,7 @@ from functools import partial
 import torch
 from torch import Tensor, nn
 
-from .base import BaseBackbone, _act, _norm
+from .base import BaseBackbone
 from .vit import MHA, ViTBlock
 
 
@@ -99,22 +99,21 @@ class SwinBlock(ViTBlock):
         dropout: float = 0.0,
         layer_scale_init: float | None = None,
         stochastic_depth: float = 0.0,
-        norm: _norm = nn.LayerNorm,
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-5,
     ) -> None:
         # fmt: off
         super().__init__(
             d_model, n_heads, bias, mlp_ratio, dropout,
-            layer_scale_init, stochastic_depth, norm, act,
+            layer_scale_init, stochastic_depth, norm_eps,
             partial(WindowAttention, input_size, d_model, n_heads, window_size, shift, bias, dropout),
         )
         # fmt: on
 
 
 class PatchMerging(nn.Module):
-    def __init__(self, d_model: int, norm: _norm = nn.LayerNorm) -> None:
+    def __init__(self, d_model: int, norm_eps: float = 1e-5) -> None:
         super().__init__()
-        self.norm = norm(d_model * 4)
+        self.norm = nn.LayerNorm(d_model * 4, norm_eps)
         self.reduction = nn.Linear(d_model * 4, d_model * 2, False)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -139,14 +138,13 @@ class SwinTransformer(BaseBackbone):
         dropout: float = 0.0,
         layer_scale_init: float | None = None,
         stochastic_depth: float = 0.0,
-        norm: _norm = nn.LayerNorm,
-        act: _act = nn.GELU,
+        norm_eps: float = 1e-5,
     ) -> None:
         assert img_size % patch_size == 0
         assert d_model % n_heads == 0
         super().__init__()
         self.patch_embed = nn.Conv2d(3, d_model, patch_size, patch_size)
-        self.norm = norm(d_model)
+        self.patch_norm = nn.LayerNorm(d_model, norm_eps)
         self.dropout = nn.Dropout(dropout)
 
         input_size = img_size // patch_size
@@ -154,7 +152,7 @@ class SwinTransformer(BaseBackbone):
         for i, (depth, window_size) in enumerate(zip(depths, window_sizes)):
             stage = nn.Sequential()
             if i > 0:
-                downsample = PatchMerging(d_model, norm)
+                downsample = PatchMerging(d_model, norm_eps)
                 input_size //= 2
                 d_model *= 2
                 n_heads *= 2
@@ -167,23 +165,23 @@ class SwinTransformer(BaseBackbone):
                 # fmt: off
                 block = SwinBlock(
                     input_size, d_model, n_heads, window_size, shift, mlp_ratio,
-                    bias, dropout, layer_scale_init, stochastic_depth, norm, act,
+                    bias, dropout, layer_scale_init, stochastic_depth, norm_eps,
                 )
                 # fmt: on
                 stage.append(block)
 
             self.stages.append(stage)
 
-        self.head_norm = norm(d_model)
+        self.norm = nn.LayerNorm(d_model, norm_eps)
 
     def get_feature_maps(self, x: Tensor) -> list[Tensor]:
-        out = [self.dropout(self.norm(self.patch_embed(x).permute(0, 2, 3, 1)))]
+        out = [self.dropout(self.patch_norm(self.patch_embed(x).permute(0, 2, 3, 1)))]
         for stage in self.stages:
             out.append(stage(out[-1]))
         return out[1:]
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.head_norm(self.get_feature_maps(x)[-1]).mean((1, 2))
+        return self.norm(self.get_feature_maps(x)[-1]).mean((1, 2))
 
     def resize_pe(self, img_size: int) -> None:
         raise NotImplementedError()
@@ -222,7 +220,7 @@ class SwinTransformer(BaseBackbone):
             m.bias.copy_(state_dict.pop(prefix + ".bias"))
 
         copy_(self.patch_embed, "patch_embed.proj")
-        copy_(self.norm, "patch_embed.norm")
+        copy_(self.patch_norm, "patch_embed.norm")
 
         for stage_idx, stage in enumerate(self.stages):
             if stage_idx > 0:
@@ -261,5 +259,5 @@ class SwinTransformer(BaseBackbone):
                 copy_(block.mlp[1].linear1, prefix + "mlp.fc1")
                 copy_(block.mlp[1].linear2, prefix + "mlp.fc2")
 
-        copy_(self.head_norm, "norm")
+        copy_(self.norm, "norm")
         assert len(state_dict) == 2  # head.weight and head.bias
