@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 
 from .base import _act, _norm
-from .vit import MHA, ViTBlock
+from .vit import MHA, ViT, ViTBlock
 
 
 # basically attention pooling
@@ -152,12 +152,7 @@ class CaiT(nn.Module):
 
     @torch.no_grad()
     def resize_pe(self, size: int, interpolation_mode: str = "bicubic") -> None:
-        old_size = int(self.pe.shape[1] ** 0.5)
-        new_size = size // self.patch_embed.weight.shape[2]
-        pe = self.pe.unflatten(1, (old_size, old_size)).permute(0, 3, 1, 2)
-        pe = F.interpolate(pe, (new_size, new_size), mode=interpolation_mode)
-        pe = pe.permute(0, 2, 3, 1).flatten(1, 2)
-        self.pe = nn.Parameter(pe)
+        ViT.resize_pe(self, size, interpolation_mode)
 
     @staticmethod
     def from_config(variant: str, img_size: int, pretrained: bool = False) -> CaiT:
