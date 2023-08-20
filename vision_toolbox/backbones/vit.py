@@ -12,6 +12,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
+from ..components import LayerScale, StochasticDepth
 from ..utils import torch_hub_download
 from .base import _act, _norm
 
@@ -58,18 +59,28 @@ class ViTBlock(nn.Module):
         bias: bool = True,
         mlp_ratio: float = 4.0,
         dropout: float = 0.0,
+        layer_scale_init: float | None = None,
+        stochastic_depth: float = 0.0,
         norm: _norm = partial(nn.LayerNorm, eps=1e-6),
         act: _act = nn.GELU,
     ) -> None:
         super().__init__()
-        self.norm1 = norm(d_model)
-        self.mha = MHA(d_model, n_heads, bias, dropout)
-        self.norm2 = norm(d_model)
-        self.mlp = MLP(d_model, int(d_model * mlp_ratio), dropout, act)
+        self.mha = nn.Sequential(
+            norm(d_model),
+            MHA(d_model, n_heads, bias, dropout),
+            LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
+            StochasticDepth(stochastic_depth),
+        )
+        self.mlp = nn.Sequential(
+            norm(d_model),
+            MLP(d_model, int(d_model * mlp_ratio), dropout, act),
+            LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
+            StochasticDepth(stochastic_depth),
+        )
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x + self.mha(self.norm1(x))
-        x = x + self.mlp(self.norm2(x))
+        x = x + self.mha(x)
+        x = x + self.mlp(x)
         return x
 
 
@@ -85,6 +96,8 @@ class ViT(nn.Module):
         bias: bool = True,
         mlp_ratio: float = 4.0,
         dropout: float = 0.0,
+        layer_scale_init: float | None = None,
+        stochastic_depth: float = 0.0,
         norm: _norm = partial(nn.LayerNorm, eps=1e-6),
         act: _act = nn.GELU,
     ) -> None:
@@ -99,9 +112,11 @@ class ViT(nn.Module):
         self.pe = nn.Parameter(torch.empty(1, pe_size, d_model))
         nn.init.normal_(self.pe, 0, 0.02)
 
-        self.layers = nn.Sequential(
-            *[ViTBlock(d_model, n_heads, bias, mlp_ratio, dropout, norm, act) for _ in range(n_layers)]
-        )
+        self.layers = nn.Sequential()
+        for _ in range(n_layers):
+            block = ViTBlock(d_model, n_heads, bias, mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm, act)
+            self.layers.append(block)
+
         self.norm = norm(d_model)
 
     def forward(self, imgs: Tensor) -> Tensor:
@@ -173,21 +188,21 @@ class ViT(nn.Module):
             prefix = f"Transformer/encoderblock_{idx}/"
             mha_prefix = prefix + "MultiHeadDotProductAttention_1/"
 
-            layer.norm1.weight.copy_(get_w(prefix + "LayerNorm_0/scale"))
-            layer.norm1.bias.copy_(get_w(prefix + "LayerNorm_0/bias"))
+            layer.mha[0].weight.copy_(get_w(prefix + "LayerNorm_0/scale"))
+            layer.mha[0].bias.copy_(get_w(prefix + "LayerNorm_0/bias"))
             w = torch.stack([get_w(mha_prefix + x + "/kernel") for x in ["query", "key", "value"]], 1)
             b = torch.stack([get_w(mha_prefix + x + "/bias") for x in ["query", "key", "value"]], 0)
-            layer.mha.in_proj.weight.copy_(w.flatten(1).T)
-            layer.mha.in_proj.bias.copy_(b.flatten())
-            layer.mha.out_proj.weight.copy_(get_w(mha_prefix + "out/kernel").flatten(0, 1).T)
-            layer.mha.out_proj.bias.copy_(get_w(mha_prefix + "out/bias"))
+            layer.mha[1].in_proj.weight.copy_(w.flatten(1).T)
+            layer.mha[1].in_proj.bias.copy_(b.flatten())
+            layer.mha[1].out_proj.weight.copy_(get_w(mha_prefix + "out/kernel").flatten(0, 1).T)
+            layer.mha[1].out_proj.bias.copy_(get_w(mha_prefix + "out/bias"))
 
-            layer.norm2.weight.copy_(get_w(prefix + "LayerNorm_2/scale"))
-            layer.norm2.bias.copy_(get_w(prefix + "LayerNorm_2/bias"))
-            layer.mlp.linear1.weight.copy_(get_w(prefix + "MlpBlock_3/Dense_0/kernel").T)
-            layer.mlp.linear1.bias.copy_(get_w(prefix + "MlpBlock_3/Dense_0/bias"))
-            layer.mlp.linear2.weight.copy_(get_w(prefix + "MlpBlock_3/Dense_1/kernel").T)
-            layer.mlp.linear2.bias.copy_(get_w(prefix + "MlpBlock_3/Dense_1/bias"))
+            layer.mlp[0].weight.copy_(get_w(prefix + "LayerNorm_2/scale"))
+            layer.mlp[0].bias.copy_(get_w(prefix + "LayerNorm_2/bias"))
+            layer.mlp[1].linear1.weight.copy_(get_w(prefix + "MlpBlock_3/Dense_0/kernel").T)
+            layer.mlp[1].linear1.bias.copy_(get_w(prefix + "MlpBlock_3/Dense_0/bias"))
+            layer.mlp[1].linear2.weight.copy_(get_w(prefix + "MlpBlock_3/Dense_1/kernel").T)
+            layer.mlp[1].linear2.bias.copy_(get_w(prefix + "MlpBlock_3/Dense_1/bias"))
 
         self.norm.weight.copy_(get_w("Transformer/encoder_norm/scale"))
         self.norm.bias.copy_(get_w("Transformer/encoder_norm/bias"))

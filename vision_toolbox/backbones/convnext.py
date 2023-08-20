@@ -10,7 +10,7 @@ from functools import partial
 import torch
 from torch import Tensor, nn
 
-from ..components import Permute, StochasticDepth
+from ..components import LayerScale, Permute, StochasticDepth
 from .base import BaseBackbone, _act, _norm
 
 
@@ -34,12 +34,14 @@ class ConvNeXtBlock(nn.Module):
         d_model: int,
         expansion_ratio: float = 4.0,
         bias: bool = True,
-        layer_scale_init: float = 1e-6,
+        layer_scale_init: float | None = 1e-6,
         stochastic_depth: float = 0.0,
         norm: _norm = partial(nn.LayerNorm, eps=1e-6),
         act: _act = nn.GELU,
         v2: bool = False,
     ) -> None:
+        if v2:
+            layer_scale_init = None
         super().__init__()
         hidden_dim = int(d_model * expansion_ratio)
         self.layers = nn.Sequential(
@@ -51,17 +53,12 @@ class ConvNeXtBlock(nn.Module):
             act(),
             GlobalResponseNorm(hidden_dim) if v2 else nn.Identity(),
             nn.Linear(hidden_dim, d_model, bias=bias),
+            LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
+            StochasticDepth(stochastic_depth),
         )
-        self.layer_scale = (
-            nn.Parameter(torch.full((d_model,), layer_scale_init)) if layer_scale_init > 0 and not v2 else None
-        )
-        self.drop = StochasticDepth(stochastic_depth)
 
     def forward(self, x: Tensor) -> Tensor:
-        out = self.layers(x)
-        if self.layer_scale is not None:
-            out = out * self.layer_scale
-        return x + self.drop(out)
+        return x + self.layers(x)
 
 
 class ConvNeXt(BaseBackbone):
@@ -71,7 +68,7 @@ class ConvNeXt(BaseBackbone):
         depths: tuple[int, ...],
         expansion_ratio: float = 4.0,
         bias: bool = True,
-        layer_scale_init: float = 1e-6,
+        layer_scale_init: float | None = 1e-6,
         stochastic_depth: float = 0.0,
         norm: _norm = partial(nn.LayerNorm, eps=1e-6),
         act: _act = nn.GELU,
@@ -187,8 +184,8 @@ class ConvNeXt(BaseBackbone):
                     block.layers[6].beta.copy_(state_dict.pop(prefix + "grn.beta").squeeze())
 
                 copy_(block.layers[7], prefix + "pwconv2")
-                if block.layer_scale is not None:
-                    block.layer_scale.copy_(state_dict.pop(prefix + "gamma"))
+                if isinstance(block.layers[8], LayerScale):
+                    block.layers[8].gamma.copy_(state_dict.pop(prefix + "gamma"))
 
         # FCMAE checkpoints don't contain head norm
         if "norm.weight" in state_dict:
