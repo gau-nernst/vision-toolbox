@@ -65,18 +65,13 @@ class CaiTCABlock(ViTBlock):
         norm: _norm = nn.LayerNorm,
         act: _act = nn.GELU,
     ) -> None:
+        # fmt: off
         super().__init__(
-            d_model,
-            n_heads,
-            bias,
-            mlp_ratio,
-            dropout,
-            layer_scale_init,
-            stochastic_depth,
-            norm,
-            act,
+            d_model, n_heads, bias, mlp_ratio, dropout,
+            layer_scale_init, stochastic_depth, norm, act,
             partial(ClassAttention, d_model, n_heads, bias, dropout),
         )
+        # fmt: on
 
     def forward(self, x: Tensor, cls_token: Tensor) -> Tensor:
         cls_token = cls_token + self.mha(torch.cat((cls_token, x), 1))
@@ -97,18 +92,13 @@ class CaiTSABlock(ViTBlock):
         norm: _norm = nn.LayerNorm,
         act: _act = nn.GELU,
     ) -> None:
+        # fmt: off
         super().__init__(
-            d_model,
-            n_heads,
-            bias,
-            mlp_ratio,
-            dropout,
-            layer_scale_init,
-            stochastic_depth,
-            norm,
-            act,
+            d_model, n_heads, bias, mlp_ratio, dropout,
+            layer_scale_init, stochastic_depth, norm, act,
             partial(TalkingHeadAttention, d_model, n_heads, bias, dropout),
         )
+        # fmt: on
 
 
 class CaiT(nn.Module):

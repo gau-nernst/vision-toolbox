@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import itertools
+from functools import partial
 
 import torch
 from torch import Tensor, nn
 
 from .base import BaseBackbone, _act, _norm
-from .vit import MHA, MLP
+from .vit import MHA, ViTBlock
 
 
 def window_partition(x: Tensor, window_size: int) -> tuple[Tensor, int, int]:
@@ -85,7 +86,7 @@ class WindowAttention(MHA):
         return x
 
 
-class SwinBlock(nn.Module):
+class SwinBlock(ViTBlock):
     def __init__(
         self,
         input_size: int,
@@ -96,19 +97,18 @@ class SwinBlock(nn.Module):
         mlp_ratio: float = 4.0,
         bias: bool = True,
         dropout: float = 0.0,
+        layer_scale_init: float | None = None,
+        stochastic_depth: float = 0.0,
         norm: _norm = nn.LayerNorm,
         act: _act = nn.GELU,
     ) -> None:
-        super().__init__()
-        self.norm1 = norm(d_model)
-        self.mha = WindowAttention(input_size, d_model, n_heads, window_size, shift, bias, dropout)
-        self.norm2 = norm(d_model)
-        self.mlp = MLP(d_model, int(d_model * mlp_ratio), dropout, act)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = x + self.mha(self.norm1(x))
-        x = x + self.mlp(self.norm2(x))
-        return x
+        # fmt: off
+        super().__init__(
+            d_model, n_heads, bias, mlp_ratio, dropout,
+            layer_scale_init, stochastic_depth, norm, act,
+            partial(WindowAttention, input_size, d_model, n_heads, window_size, shift, bias, dropout),
+        )
+        # fmt: on
 
 
 class PatchMerging(nn.Module):
@@ -137,6 +137,8 @@ class SwinTransformer(BaseBackbone):
         mlp_ratio: float = 4.0,
         bias: bool = True,
         dropout: float = 0.0,
+        layer_scale_init: float | None = None,
+        stochastic_depth: float = 0.0,
         norm: _norm = nn.LayerNorm,
         act: _act = nn.GELU,
     ) -> None:
@@ -162,7 +164,12 @@ class SwinTransformer(BaseBackbone):
 
             for i in range(depth):
                 shift = (i % 2) and input_size > window_size
-                block = SwinBlock(input_size, d_model, n_heads, window_size, shift, mlp_ratio, bias, dropout, norm, act)
+                # fmt: off
+                block = SwinBlock(
+                    input_size, d_model, n_heads, window_size, shift, mlp_ratio,
+                    bias, dropout, layer_scale_init, stochastic_depth, norm, act,
+                )
+                # fmt: on
                 stage.append(block)
 
             self.stages.append(stage)
@@ -234,25 +241,25 @@ class SwinTransformer(BaseBackbone):
                 prefix = f"layers.{stage_idx}.blocks.{block_idx - 1}."
                 block_idx += 1
 
-                if block.mha.attn_mask is not None:
-                    torch.testing.assert_close(block.mha.attn_mask, state_dict.pop(prefix + "attn_mask"))
+                copy_(block.mha[0], prefix + "norm1")
+                if block.mha[1].attn_mask is not None:
+                    torch.testing.assert_close(block.mha[1].attn_mask, state_dict.pop(prefix + "attn_mask"))
                 torch.testing.assert_close(
-                    block.mha.relative_pe_index, state_dict.pop(prefix + "attn.relative_position_index")
+                    block.mha[1].relative_pe_index, state_dict.pop(prefix + "attn.relative_position_index")
                 )
-                copy_(block.norm1, prefix + "norm1")
                 q_w, k_w, v_w = state_dict.pop(prefix + "attn.qkv.weight").chunk(3, 0)
-                block.mha.q_proj.weight.copy_(q_w)
-                block.mha.k_proj.weight.copy_(k_w)
-                block.mha.v_proj.weight.copy_(v_w)
+                block.mha[1].q_proj.weight.copy_(q_w)
+                block.mha[1].k_proj.weight.copy_(k_w)
+                block.mha[1].v_proj.weight.copy_(v_w)
                 q_b, k_b, v_b = state_dict.pop(prefix + "attn.qkv.bias").chunk(3, 0)
-                block.mha.q_proj.bias.copy_(q_b)
-                block.mha.k_proj.bias.copy_(k_b)
-                block.mha.v_proj.bias.copy_(v_b)
-                copy_(block.mha.out_proj, prefix + "attn.proj")
-                block.mha.relative_pe_table.copy_(state_dict.pop(prefix + "attn.relative_position_bias_table").T)
-                copy_(block.norm2, prefix + "norm2")
-                copy_(block.mlp.linear1, prefix + "mlp.fc1")
-                copy_(block.mlp.linear2, prefix + "mlp.fc2")
+                block.mha[1].q_proj.bias.copy_(q_b)
+                block.mha[1].k_proj.bias.copy_(k_b)
+                block.mha[1].v_proj.bias.copy_(v_b)
+                copy_(block.mha[1].out_proj, prefix + "attn.proj")
+                block.mha[1].relative_pe_table.copy_(state_dict.pop(prefix + "attn.relative_position_bias_table").T)
+                copy_(block.mlp[0], prefix + "norm2")
+                copy_(block.mlp[1].linear1, prefix + "mlp.fc1")
+                copy_(block.mlp[1].linear2, prefix + "mlp.fc2")
 
         copy_(self.head_norm, "norm")
         assert len(state_dict) == 2  # head.weight and head.bias
