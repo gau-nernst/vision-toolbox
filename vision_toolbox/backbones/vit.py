@@ -126,7 +126,7 @@ class ViT(nn.Module):
     def forward(self, imgs: Tensor) -> Tensor:
         out = self.patch_embed(imgs).flatten(2).transpose(1, 2)  # (N, C, H, W) -> (N, H*W, C)
         if self.cls_token is not None:
-            out = torch.cat([self.cls_token.expand(out.shape[0], -1, -1), out], 1)
+            out = torch.cat([self.cls_token, out], 1)
         out = self.layers(out + self.pe)
         out = self.norm(out)
         out = out[:, 0] if self.cls_token is not None else out.mean(1)
