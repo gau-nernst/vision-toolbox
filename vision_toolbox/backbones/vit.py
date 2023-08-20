@@ -151,7 +151,9 @@ class ViT(nn.Module):
         self.pe = nn.Parameter(pe)
 
     @staticmethod
-    def from_config(variant: str, patch_size: int, img_size: int, pretrained: bool = False) -> ViT:
+    def from_config(variant: str, img_size: int, pretrained: bool = False) -> ViT:
+        variant, patch_size = variant.split("_")
+
         d_model, depth, n_heads = dict(
             Ti=(192, 12, 3),
             S=(384, 12, 6),
@@ -159,9 +161,11 @@ class ViT(nn.Module):
             L=(1024, 24, 16),
             H=(1280, 32, 16),
         )[variant]
+        patch_size = int(patch_size)
         m = ViT(d_model, depth, n_heads, patch_size, img_size)
 
         if pretrained:
+            assert img_size == 224
             ckpt = {
                 ("Ti", 16): "Ti_16-i21k-300ep-lr_0.001-aug_none-wd_0.03-do_0.0-sd_0.0.npz",
                 ("S", 32): "S_32-i21k-300ep-lr_0.001-aug_none-wd_0.1-do_0.0-sd_0.0.npz",
@@ -172,8 +176,6 @@ class ViT(nn.Module):
             }[(variant, patch_size)]
             base_url = "https://storage.googleapis.com/vit_models/augreg/"
             m.load_jax_weights(torch_hub_download(base_url + ckpt))
-            if img_size != 224:
-                m.resize_pe(img_size)
 
         return m
 
