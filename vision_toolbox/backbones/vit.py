@@ -12,6 +12,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
+from ..components import LayerScale, StochasticDepth
 from ..utils import torch_hub_download
 from .base import _act, _norm
 
@@ -19,15 +20,19 @@ from .base import _act, _norm
 class MHA(nn.Module):
     def __init__(self, d_model: int, n_heads: int, bias: bool = True, dropout: float = 0.0) -> None:
         super().__init__()
-        self.in_proj = nn.Linear(d_model, d_model * 3, bias)
+        self.q_proj = nn.Linear(d_model, d_model, bias)
+        self.k_proj = nn.Linear(d_model, d_model, bias)
+        self.v_proj = nn.Linear(d_model, d_model, bias)
         self.out_proj = nn.Linear(d_model, d_model, bias)
         self.n_heads = n_heads
         self.dropout = dropout
         self.scale = (d_model // n_heads) ** (-0.5)
 
     def forward(self, x: Tensor, attn_bias: Tensor | None = None) -> Tensor:
-        qkv = self.in_proj(x)
-        q, k, v = qkv.unflatten(-1, (3, self.n_heads, -1)).transpose(-2, -4).unbind(-3)  # (B, n_heads, L, head_dim)
+        q = self.q_proj(x).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)  # (B, n_heads, L, head_dim)
+        k = self.k_proj(x).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)
+        v = self.v_proj(x).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)
+
         if hasattr(F, "scaled_dot_product_attention"):
             out = F.scaled_dot_product_attention(q, k, v, attn_bias, self.dropout if self.training else 0.0)
         else:
@@ -58,26 +63,39 @@ class ViTBlock(nn.Module):
         bias: bool = True,
         mlp_ratio: float = 4.0,
         dropout: float = 0.0,
+        layer_scale_init: float | None = None,
+        stochastic_depth: float = 0.0,
         norm: _norm = partial(nn.LayerNorm, eps=1e-6),
         act: _act = nn.GELU,
+        attention: type[nn.Module] | None = None,
     ) -> None:
+        if attention is None:
+            attention = partial(MHA, d_model, n_heads, bias, dropout)
         super().__init__()
-        self.norm1 = norm(d_model)
-        self.mha = MHA(d_model, n_heads, bias, dropout)
-        self.norm2 = norm(d_model)
-        self.mlp = MLP(d_model, int(d_model * mlp_ratio), dropout, act)
+        self.mha = nn.Sequential(
+            norm(d_model),
+            attention(),
+            LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
+            StochasticDepth(stochastic_depth),
+        )
+        self.mlp = nn.Sequential(
+            norm(d_model),
+            MLP(d_model, int(d_model * mlp_ratio), dropout, act),
+            LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
+            StochasticDepth(stochastic_depth),
+        )
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x + self.mha(self.norm1(x))
-        x = x + self.mlp(self.norm2(x))
+        x = x + self.mha(x)
+        x = x + self.mlp(x)
         return x
 
 
 class ViT(nn.Module):
     def __init__(
         self,
-        n_layers: int,
         d_model: int,
+        depth: int,
         n_heads: int,
         patch_size: int,
         img_size: int,
@@ -85,6 +103,8 @@ class ViT(nn.Module):
         bias: bool = True,
         mlp_ratio: float = 4.0,
         dropout: float = 0.0,
+        layer_scale_init: float | None = None,
+        stochastic_depth: float = 0.0,
         norm: _norm = partial(nn.LayerNorm, eps=1e-6),
         act: _act = nn.GELU,
     ) -> None:
@@ -99,15 +119,17 @@ class ViT(nn.Module):
         self.pe = nn.Parameter(torch.empty(1, pe_size, d_model))
         nn.init.normal_(self.pe, 0, 0.02)
 
-        self.layers = nn.Sequential(
-            *[ViTBlock(d_model, n_heads, bias, mlp_ratio, dropout, norm, act) for _ in range(n_layers)]
-        )
+        self.layers = nn.Sequential()
+        for _ in range(depth):
+            block = ViTBlock(d_model, n_heads, bias, mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm, act)
+            self.layers.append(block)
+
         self.norm = norm(d_model)
 
     def forward(self, imgs: Tensor) -> Tensor:
         out = self.patch_embed(imgs).flatten(2).transpose(1, 2)  # (N, C, H, W) -> (N, H*W, C)
         if self.cls_token is not None:
-            out = torch.cat([self.cls_token.expand(out.shape[0], -1, -1), out], 1)
+            out = torch.cat([self.cls_token, out], 1)
         out = self.layers(out + self.pe)
         out = self.norm(out)
         out = out[:, 0] if self.cls_token is not None else out.mean(1)
@@ -129,17 +151,21 @@ class ViT(nn.Module):
         self.pe = nn.Parameter(pe)
 
     @staticmethod
-    def from_config(variant: str, patch_size: int, img_size: int, pretrained: bool = False) -> ViT:
-        n_layers, d_model, n_heads = dict(
-            Ti=(12, 192, 3),
-            S=(12, 384, 6),
-            B=(12, 768, 12),
-            L=(24, 1024, 16),
-            H=(32, 1280, 16),
+    def from_config(variant: str, img_size: int, pretrained: bool = False) -> ViT:
+        variant, patch_size = variant.split("_")
+
+        d_model, depth, n_heads = dict(
+            Ti=(192, 12, 3),
+            S=(384, 12, 6),
+            B=(768, 12, 12),
+            L=(1024, 24, 16),
+            H=(1280, 32, 16),
         )[variant]
-        m = ViT(n_layers, d_model, n_heads, patch_size, img_size)
+        patch_size = int(patch_size)
+        m = ViT(d_model, depth, n_heads, patch_size, img_size)
 
         if pretrained:
+            assert img_size == 224
             ckpt = {
                 ("Ti", 16): "Ti_16-i21k-300ep-lr_0.001-aug_none-wd_0.03-do_0.0-sd_0.0.npz",
                 ("S", 32): "S_32-i21k-300ep-lr_0.001-aug_none-wd_0.1-do_0.0-sd_0.0.npz",
@@ -150,8 +176,6 @@ class ViT(nn.Module):
             }[(variant, patch_size)]
             base_url = "https://storage.googleapis.com/vit_models/augreg/"
             m.load_jax_weights(torch_hub_download(base_url + ckpt))
-            if img_size != 224:
-                m.resize_pe(img_size)
 
         return m
 
@@ -173,21 +197,23 @@ class ViT(nn.Module):
             prefix = f"Transformer/encoderblock_{idx}/"
             mha_prefix = prefix + "MultiHeadDotProductAttention_1/"
 
-            layer.norm1.weight.copy_(get_w(prefix + "LayerNorm_0/scale"))
-            layer.norm1.bias.copy_(get_w(prefix + "LayerNorm_0/bias"))
-            w = torch.stack([get_w(mha_prefix + x + "/kernel") for x in ["query", "key", "value"]], 1)
-            b = torch.stack([get_w(mha_prefix + x + "/bias") for x in ["query", "key", "value"]], 0)
-            layer.mha.in_proj.weight.copy_(w.flatten(1).T)
-            layer.mha.in_proj.bias.copy_(b.flatten())
-            layer.mha.out_proj.weight.copy_(get_w(mha_prefix + "out/kernel").flatten(0, 1).T)
-            layer.mha.out_proj.bias.copy_(get_w(mha_prefix + "out/bias"))
+            layer.mha[0].weight.copy_(get_w(prefix + "LayerNorm_0/scale"))
+            layer.mha[0].bias.copy_(get_w(prefix + "LayerNorm_0/bias"))
+            layer.mha[1].q_proj.weight.copy_(get_w(mha_prefix + "query/kernel").flatten(1).T)
+            layer.mha[1].k_proj.weight.copy_(get_w(mha_prefix + "key/kernel").flatten(1).T)
+            layer.mha[1].v_proj.weight.copy_(get_w(mha_prefix + "value/kernel").flatten(1).T)
+            layer.mha[1].q_proj.bias.copy_(get_w(mha_prefix + "query/bias").flatten())
+            layer.mha[1].k_proj.bias.copy_(get_w(mha_prefix + "key/bias").flatten())
+            layer.mha[1].v_proj.bias.copy_(get_w(mha_prefix + "value/bias").flatten())
+            layer.mha[1].out_proj.weight.copy_(get_w(mha_prefix + "out/kernel").flatten(0, 1).T)
+            layer.mha[1].out_proj.bias.copy_(get_w(mha_prefix + "out/bias"))
 
-            layer.norm2.weight.copy_(get_w(prefix + "LayerNorm_2/scale"))
-            layer.norm2.bias.copy_(get_w(prefix + "LayerNorm_2/bias"))
-            layer.mlp.linear1.weight.copy_(get_w(prefix + "MlpBlock_3/Dense_0/kernel").T)
-            layer.mlp.linear1.bias.copy_(get_w(prefix + "MlpBlock_3/Dense_0/bias"))
-            layer.mlp.linear2.weight.copy_(get_w(prefix + "MlpBlock_3/Dense_1/kernel").T)
-            layer.mlp.linear2.bias.copy_(get_w(prefix + "MlpBlock_3/Dense_1/bias"))
+            layer.mlp[0].weight.copy_(get_w(prefix + "LayerNorm_2/scale"))
+            layer.mlp[0].bias.copy_(get_w(prefix + "LayerNorm_2/bias"))
+            layer.mlp[1].linear1.weight.copy_(get_w(prefix + "MlpBlock_3/Dense_0/kernel").T)
+            layer.mlp[1].linear1.bias.copy_(get_w(prefix + "MlpBlock_3/Dense_0/bias"))
+            layer.mlp[1].linear2.weight.copy_(get_w(prefix + "MlpBlock_3/Dense_1/kernel").T)
+            layer.mlp[1].linear2.bias.copy_(get_w(prefix + "MlpBlock_3/Dense_1/bias"))
 
         self.norm.weight.copy_(get_w("Transformer/encoder_norm/scale"))
         self.norm.bias.copy_(get_w("Transformer/encoder_norm/bias"))

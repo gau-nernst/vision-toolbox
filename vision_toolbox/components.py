@@ -178,3 +178,15 @@ class StochasticDepth(nn.Module):
 
     def extra_repr(self) -> str:
         return f"p={self.p}"
+
+
+class LayerScale(nn.Module):
+    def __init__(self, dim: int, init: float) -> None:
+        super().__init__()
+        self.gamma = nn.Parameter(torch.full((dim,), init))
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x * self.gamma
+
+    def extra_repr(self) -> str:
+        return f"gamma={self.gamma}"

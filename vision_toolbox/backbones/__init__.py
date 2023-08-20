@@ -1,3 +1,4 @@
+from .cait import CaiT
 from .convnext import ConvNeXt
 from .darknet import Darknet, DarknetYOLOv5
 from .mlp_mixer import MLPMixer
