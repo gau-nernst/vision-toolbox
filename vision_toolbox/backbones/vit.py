@@ -131,9 +131,7 @@ class ViT(nn.Module):
         if self.cls_token is not None:
             out = torch.cat([self.cls_token, out], 1)
         out = self.layers(out + self.pe)
-        out = self.norm(out)
-        out = out[:, 0] if self.cls_token is not None else out.mean(1)
-        return out
+        return self.norm(out[:, 0]) if self.cls_token is not None else self.norm(out).mean(1)
 
     @torch.no_grad()
     def resize_pe(self, size: int, interpolation_mode: str = "bicubic") -> None:
