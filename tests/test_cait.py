@@ -9,6 +9,13 @@ def test_forward():
     m(torch.randn(1, 3, 224, 224))
 
 
+def test_resize_pe():
+    m = CaiT.from_config("xxs_24", 224)
+    m(torch.randn(1, 3, 224, 224))
+    m.resize_pe(256)
+    m(torch.randn(1, 3, 256, 256))
+
+
 def test_from_pretrained():
     m = CaiT.from_config("xxs_24", 224, True).eval()
     x = torch.randn(1, 3, 224, 224)

@@ -4,6 +4,11 @@ import torch
 from vision_toolbox.backbones import ViT
 
 
+def test_forward():
+    m = ViT.from_config("Ti", 16, 224)
+    m(torch.randn(1, 3, 224, 224))
+
+
 def test_resize_pe():
     m = ViT.from_config("Ti", 16, 224)
     m(torch.randn(1, 3, 224, 224))
