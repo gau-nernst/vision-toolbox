@@ -40,13 +40,13 @@ class DeiT(ViT):
         self.dist_token = nn.Parameter(torch.zeros(1, 1, d_model))
 
     def forward(self, imgs: Tensor) -> Tensor:
-        out = self.patch_embed(imgs).flatten(2).transpose(1, 2) + self.pe  # (N, C, H, W) -> (N, H*W, C)
-        out = torch.cat([self.cls_token, self.dist_token, out], 1)
+        out = self.patch_embed(imgs).flatten(2).transpose(1, 2)  # (N, C, H, W) -> (N, H*W, C)
+        out = torch.cat([self.cls_token, self.dist_token, out + self.pe], 1)
         out = self.layers(out)
         return self.norm(out[:, :2]).mean(1)
 
     @staticmethod
-    def from_config(variant: str, img_size: int, version: bool = False, pretrained: bool = False) -> DeiT:
+    def from_config(variant: str, img_size: int, pretrained: bool = False) -> DeiT:
         variant, patch_size = variant.split("_")
 
         d_model, depth, n_heads = dict(
