@@ -144,8 +144,7 @@ class ViT(nn.Module):
         pe = pe.permute(0, 2, 3, 1).flatten(1, 2)
 
         if self.cls_token is not None:
-            pe = torch.cat((self.pe[:, 0:1], pe), 1)
-
+            pe = torch.cat((self.pe[:, :1], pe), 1)
         self.pe = nn.Parameter(pe)
 
     @staticmethod
@@ -155,6 +154,7 @@ class ViT(nn.Module):
         d_model, depth, n_heads = dict(
             Ti=(192, 12, 3),
             S=(384, 12, 6),
+            M=(512, 12, 8),
             B=(768, 12, 12),
             L=(1024, 24, 16),
             H=(1280, 32, 16),

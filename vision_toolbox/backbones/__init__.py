@@ -1,6 +1,7 @@
 from .cait import CaiT
 from .convnext import ConvNeXt
 from .darknet import Darknet, DarknetYOLOv5
+from .deit import DeiT
 from .mlp_mixer import MLPMixer
 from .patchconvnet import PatchConvNet
 from .swin import SwinTransformer
