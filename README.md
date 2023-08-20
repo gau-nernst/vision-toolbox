@@ -36,13 +36,20 @@ For object detection, usually only the last 4 feature maps are used. It is the r
 outputs = model.get_feature_maps(inputs)[-4:]   # last 4 feature maps
 ```
 
-## Backbones
+## Backbones with ported weights
+
+- ViT
+- MLP-Mixer
+- CaiT
+- Swin 
+- ConvNeXt and ConvNeXt-V2
+
+## Backbones trained by me
 
 Implemented backbones:
 
 - [Darknet](#darknet)
 - [VoVNet](#vovnet)
-- [PatchConvNet](#patchconvnet)
 
 ### ImageNet pre-training
 
