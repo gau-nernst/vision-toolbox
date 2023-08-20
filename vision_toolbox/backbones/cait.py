@@ -1,29 +1,20 @@
 # https://arxiv.org/abs/2103.17239
 # https://github.com/facebookresearch/deit
+
 from __future__ import annotations
+
+from functools import partial
 
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from ..components import LayerScale, StochasticDepth
 from .base import _act, _norm
-from .vit import MLP
+from .vit import MHA, ViTBlock
 
 
 # basically attention pooling
-class ClassAttention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, bias: bool = True, dropout: float = 0.0) -> None:
-        super().__init__()
-        self.q_proj = nn.Linear(d_model, d_model, bias)
-        self.k_proj = nn.Linear(d_model, d_model, bias)
-        self.v_proj = nn.Linear(d_model, d_model, bias)
-        self.out_proj = nn.Linear(d_model, d_model, bias)
-
-        self.n_heads = n_heads
-        self.dropout = dropout
-        self.scale = (d_model // n_heads) ** (-0.5)
-
+class ClassAttention(MHA):
     def forward(self, x: Tensor) -> None:
         q = self.q_proj(x[:, 0]).unflatten(-1, (self.n_heads, -1)).unsqueeze(2)  # (B, n_heads, 1, head_dim)
         k = self.k_proj(x).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)  # (B, n_heads, L, head_dim)
@@ -39,21 +30,15 @@ class ClassAttention(nn.Module):
 
 
 # does not support flash attention
-class TalkingHeadAttention(nn.Module):
+class TalkingHeadAttention(MHA):
     def __init__(self, d_model: int, n_heads: int, bias: bool = True, dropout: float = 0.0) -> None:
-        super().__init__()
-        self.q_proj = nn.Linear(d_model, d_model, bias)
-        self.k_proj = nn.Linear(d_model, d_model, bias)
-        self.v_proj = nn.Linear(d_model, d_model, bias)
-        self.out_proj = nn.Linear(d_model, d_model, bias)
+        super().__init__(d_model, n_heads, bias, dropout)
         self.talking_head_proj = nn.Sequential(
             nn.Conv2d(n_heads, n_heads, 1),  # impl as 1x1 conv to avoid permutating data
             nn.Softmax(-1),
             nn.Conv2d(n_heads, n_heads, 1),
             nn.Dropout(dropout),
         )
-        self.n_heads = n_heads
-        self.scale = (d_model // n_heads) ** (-0.5)
 
     def forward(self, x: Tensor) -> Tensor:
         q = self.q_proj(x).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)  # (B, n_heads, L, head_dim)
@@ -67,7 +52,7 @@ class TalkingHeadAttention(nn.Module):
         return out
 
 
-class CaiTCABlock(nn.Module):
+class CaiTCABlock(ViTBlock):
     def __init__(
         self,
         d_model: int,
@@ -80,18 +65,17 @@ class CaiTCABlock(nn.Module):
         norm: _norm = nn.LayerNorm,
         act: _act = nn.GELU,
     ) -> None:
-        super().__init__()
-        self.mha = nn.Sequential(
-            norm(d_model),
-            ClassAttention(d_model, n_heads, bias, dropout),
-            LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
-            StochasticDepth(stochastic_depth),
-        )
-        self.mlp = nn.Sequential(
-            norm(d_model),
-            MLP(d_model, int(d_model * mlp_ratio), dropout, act),
-            LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
-            StochasticDepth(stochastic_depth),
+        super().__init__(
+            d_model,
+            n_heads,
+            bias,
+            mlp_ratio,
+            dropout,
+            layer_scale_init,
+            stochastic_depth,
+            norm,
+            act,
+            partial(ClassAttention, d_model, n_heads, bias, dropout),
         )
 
     def forward(self, x: Tensor, cls_token: Tensor) -> Tensor:
@@ -100,7 +84,7 @@ class CaiTCABlock(nn.Module):
         return cls_token
 
 
-class CaiTSABlock(nn.Module):
+class CaiTSABlock(ViTBlock):
     def __init__(
         self,
         d_model: int,
@@ -113,24 +97,18 @@ class CaiTSABlock(nn.Module):
         norm: _norm = nn.LayerNorm,
         act: _act = nn.GELU,
     ) -> None:
-        super().__init__()
-        self.mha = nn.Sequential(
-            norm(d_model),
-            TalkingHeadAttention(d_model, n_heads, bias, dropout),
-            LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
-            StochasticDepth(stochastic_depth),
+        super().__init__(
+            d_model,
+            n_heads,
+            bias,
+            mlp_ratio,
+            dropout,
+            layer_scale_init,
+            stochastic_depth,
+            norm,
+            act,
+            partial(TalkingHeadAttention, d_model, n_heads, bias, dropout),
         )
-        self.mlp = nn.Sequential(
-            norm(d_model),
-            MLP(d_model, int(d_model * mlp_ratio), dropout, act),
-            LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
-            StochasticDepth(stochastic_depth),
-        )
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = x + self.mha(x)
-        x = x + self.mlp(x)
-        return x
 
 
 class CaiT(nn.Module):

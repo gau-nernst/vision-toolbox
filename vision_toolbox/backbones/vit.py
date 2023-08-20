@@ -67,11 +67,14 @@ class ViTBlock(nn.Module):
         stochastic_depth: float = 0.0,
         norm: _norm = partial(nn.LayerNorm, eps=1e-6),
         act: _act = nn.GELU,
+        attention: type[nn.Module] | None = None,
     ) -> None:
+        if attention is None:
+            attention = partial(MHA, d_model, n_heads, bias, dropout)
         super().__init__()
         self.mha = nn.Sequential(
             norm(d_model),
-            MHA(d_model, n_heads, bias, dropout),
+            attention(),
             LayerScale(d_model, layer_scale_init) if layer_scale_init is not None else nn.Identity(),
             StochasticDepth(stochastic_depth),
         )
