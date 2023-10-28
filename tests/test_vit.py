@@ -17,7 +17,7 @@ def test_resize_pe():
 
 
 def test_from_pretrained():
-    m = ViT.from_config("Ti_16", 224, True).eval()
+    m = ViT.from_config("Ti_16", 224, weights="augreg").eval()
     x = torch.randn(1, 3, 224, 224)
     out = m(x)
 
