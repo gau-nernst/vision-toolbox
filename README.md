@@ -38,7 +38,7 @@ outputs = model.get_feature_maps(inputs)[-4:]   # last 4 feature maps
 
 ## Backbones with ported weights
 
-- ViT
+- ViT: AugReg (Google), DeiT/DeiT3 (Facebook), SigLIP (Google)
 - MLP-Mixer
 - CaiT
 - Swin 
