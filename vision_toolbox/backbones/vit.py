@@ -169,10 +169,10 @@ class ViT(nn.Module):
 
         return m
 
-    # https://github.com/google-research/vision_transformer
     @torch.no_grad()
     def load_jax_ckpt(self, ckpt: str, big_vision: bool = False, prefix: str = "") -> None:
         if big_vision:
+            # https://github.com/google-research/big_vision
             gcs_bucket = "big_vision"
             mha_norm = "LayerNorm_0"
             mha = "MultiHeadDotProductAttention_0"
@@ -180,6 +180,7 @@ class ViT(nn.Module):
             mlp = "MlpBlock_0"
 
         else:
+            # https://github.com/google-research/vision_transformer
             gcs_bucket = "vit_models"
             mha_norm = "LayerNorm_0"
             mha = "MultiHeadDotProductAttention_1"
