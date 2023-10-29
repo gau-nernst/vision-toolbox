@@ -26,10 +26,14 @@ class MHA(nn.Module):
         self.dropout = dropout
         self.scale = (d_model // n_heads) ** (-0.5)
 
-    def forward(self, x: Tensor, attn_bias: Tensor | None = None) -> Tensor:
-        q = self.q_proj(x).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)  # (B, n_heads, L, head_dim)
-        k = self.k_proj(x).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)
-        v = self.v_proj(x).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)
+    def forward(
+        self, q: Tensor, k: Tensor | None = None, v: Tensor | None = None, *, attn_bias: Tensor | None = None
+    ) -> Tensor:
+        k = q if k is None else k
+        v = k if v is None else v
+        q = self.q_proj(q).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)  # (B, n_heads, L, head_dim)
+        k = self.k_proj(k).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)
+        v = self.v_proj(v).unflatten(-1, (self.n_heads, -1)).transpose(-2, -3)
 
         if hasattr(F, "scaled_dot_product_attention"):
             out = F.scaled_dot_product_attention(q, k, v, attn_bias, self.dropout if self.training else 0.0)
@@ -88,6 +92,22 @@ class ViTBlock(nn.Module):
         return x
 
 
+class MHAPooling(nn.Module):
+    def __init__(
+        self, d_model: int, n_heads: int, bias: bool = True, mlp_ratio: float = 4.0, norm_eps: float = 1e-6
+    ) -> None:
+        super().__init__()
+        self.probe = nn.Parameter(torch.zeros(1, 1, d_model))
+        self.mha = MHA(d_model, n_heads, bias)
+        self.norm = nn.LayerNorm(d_model, norm_eps)
+        self.mlp = MLP(d_model, int(d_model * mlp_ratio))
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.mha(self.probe, x).squeeze(1)
+        x = x + self.mlp(self.norm(x))
+        return x
+
+
 class ViT(nn.Module):
     def __init__(
         self,
@@ -97,6 +117,7 @@ class ViT(nn.Module):
         patch_size: int,
         img_size: int,
         cls_token: bool = True,
+        pool_type: str = "cls_token",
         bias: bool = True,
         mlp_ratio: float = 4.0,
         dropout: float = 0.0,
@@ -117,13 +138,23 @@ class ViT(nn.Module):
             self.layers.append(block)
 
         self.norm = nn.LayerNorm(d_model, norm_eps)
+        self.pool_type = pool_type
+        self.pooler = MHAPooling(d_model, n_heads, bias, mlp_ratio, norm_eps) if pool_type == "mha" else None
 
     def forward(self, imgs: Tensor) -> Tensor:
         out = self.patch_embed(imgs).flatten(2).transpose(1, 2) + self.pe  # (N, C, H, W) -> (N, H*W, C)
         if self.cls_token is not None:
             out = torch.cat([self.cls_token, out], 1)
         out = self.layers(out)
-        return self.norm(out[:, 0]) if self.cls_token is not None else self.norm(out).mean(1)
+
+        if self.pool_type == "cls_token":
+            return self.norm(out[:, 0])
+        elif self.pool_type == "gap":
+            return self.norm(out).mean(1)
+        elif self.pool_type == "mha":
+            return self.pooler(self.norm(out))
+        else:
+            raise RuntimeError
 
     @torch.no_grad()
     def resize_pe(self, size: int, interpolation_mode: str = "bicubic") -> None:
@@ -147,7 +178,11 @@ class ViT(nn.Module):
             H=(1280, 32, 16),
         )[variant]
         patch_size = int(patch_size)
-        m = ViT(d_model, depth, n_heads, patch_size, img_size)
+        kwargs = dict()
+        if weights == "siglip":
+            kwargs.update(cls_token=False, pool_type="mha")
+
+        m = ViT(d_model, depth, n_heads, patch_size, img_size, **kwargs)
 
         if weights == "augreg":
             assert img_size == 224
@@ -159,10 +194,18 @@ class ViT(nn.Module):
                 ("B", 16): "B_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.0-sd_0.0.npz",
                 ("L", 16): "L_16-i21k-300ep-lr_0.001-aug_strong1-wd_0.1-do_0.0-sd_0.0.npz",
             }[(variant, patch_size)]
-            m.load_jax_ckpt(f"augreg/{ckpt}")
+            m.load_flax_ckpt(f"augreg/{ckpt}")
 
         elif weights == "siglip":
-            raise NotImplementedError
+            ckpt = {
+                ("B", 16, 224): "webli_en_b16_224_63724782.npz",
+                ("B", 16, 256): "webli_en_b16_256_60500360.npz",
+                ("B", 16, 384): "webli_en_b16_384_68578854.npz",
+                ("B", 16, 512): "webli_en_b16_512_68580893.npz",
+                ("L", 16, 256): "webli_en_l16_256_60552751.npz",
+                ("L", 16, 384): "webli_en_l16_384_63634585.npz",
+            }[(variant, patch_size, img_size)]
+            m.load_flax_ckpt(f"siglip/{ckpt}", big_vision=True, prefix="params/img/")
 
         elif not weights is None:
             raise ValueError(f"Unsupported weights={weights}")
@@ -170,7 +213,7 @@ class ViT(nn.Module):
         return m
 
     @torch.no_grad()
-    def load_jax_ckpt(self, ckpt: str, big_vision: bool = False, prefix: str = "") -> None:
+    def load_flax_ckpt(self, ckpt: str, *, big_vision: bool = False, prefix: str = "") -> None:
         if big_vision:
             # https://github.com/google-research/big_vision
             gcs_bucket = "big_vision"
@@ -188,44 +231,59 @@ class ViT(nn.Module):
             mlp = "MlpBlock_3"
 
         path = torch_hub_download(f"https://storage.googleapis.com/{gcs_bucket}/{ckpt}")
-        jax_weights = {k.lstrip(prefix): torch.from_numpy(v) for k, v in np.load(path).items() if k.startswith(prefix)}
+        jax_weights = {k[len(prefix) :]: torch.from_numpy(v) for k, v in np.load(path).items() if k.startswith(prefix)}
 
-        self.cls_token.copy_(jax_weights["cls"])
-        pe = jax_weights["Transformer/posembed_input/pos_embedding"]
-        self.cls_token.add_(pe[:, 0])
-        self.pe.copy_(pe[:, 1:])
-        load_jax_conv2d(self.patch_embed, jax_weights, "embedding")
-        load_jax_ln(self.norm, jax_weights, "Transformer/encoder_norm")
+        if self.cls_token is not None:
+            self.cls_token.copy_(jax_weights.pop("cls"))
+        if big_vision:
+            self.pe.copy_(jax_weights.pop("pos_embedding"))
+        else:
+            pe = jax_weights.pop("Transformer/posembed_input/pos_embedding")
+            self.cls_token.add_(pe[:, 0])
+            self.pe.copy_(pe[:, 1:])
+        load_flax_conv2d(self.patch_embed, jax_weights, "embedding")
+        load_flax_ln(self.norm, jax_weights, "Transformer/encoder_norm")
 
         for i, layer in enumerate(self.layers):
-            load_jax_ln(layer.mha[0], jax_weights, f"Transformer/encoderblock_{i}/{mha_norm}")
-            load_jax_mha(layer.mha[1], jax_weights, f"Transformer/encoderblock_{i}/{mha}")
-            load_jax_ln(layer.mlp[0], jax_weights, f"Transformer/encoderblock_{i}/{mlp_norm}")
-            load_jax_linear(layer.mlp[1].linear1, jax_weights, f"Transformer/encoderblock_{i}/{mlp}/Dense_0")
-            load_jax_linear(layer.mlp[1].linear2, jax_weights, f"Transformer/encoderblock_{i}/{mlp}/Dense_1")
+            load_flax_ln(layer.mha[0], jax_weights, f"Transformer/encoderblock_{i}/{mha_norm}")
+            load_flax_mha(layer.mha[1], jax_weights, f"Transformer/encoderblock_{i}/{mha}")
+            load_flax_ln(layer.mlp[0], jax_weights, f"Transformer/encoderblock_{i}/{mlp_norm}")
+            load_flax_linear(layer.mlp[1].linear1, jax_weights, f"Transformer/encoderblock_{i}/{mlp}/Dense_0")
+            load_flax_linear(layer.mlp[1].linear2, jax_weights, f"Transformer/encoderblock_{i}/{mlp}/Dense_1")
+
+        # big_vision only
+        if self.pooler is not None:
+            self.pooler.probe.copy_(jax_weights.pop("MAPHead_0/probe"))
+            load_flax_mha(self.pooler.mha, jax_weights, "MAPHead_0/MultiHeadDotProductAttention_0")
+            load_flax_ln(self.pooler.norm, jax_weights, "MAPHead_0/LayerNorm_0")
+            load_flax_linear(self.pooler.mlp.linear1, jax_weights, "MAPHead_0/MlpBlock_0/Dense_0")
+            load_flax_linear(self.pooler.mlp.linear2, jax_weights, "MAPHead_0/MlpBlock_0/Dense_1")
+
+        if len(jax_weights) > 0:
+            print(jax_weights.keys())
 
 
-def load_jax_ln(norm: nn.LayerNorm, weights: dict[str, Tensor], prefix: str) -> None:
-    norm.weight.copy_(weights[f"{prefix}/scale"])
-    norm.bias.copy_(weights[f"{prefix}/bias"])
+def load_flax_ln(norm: nn.LayerNorm, weights: dict[str, Tensor], prefix: str) -> None:
+    norm.weight.copy_(weights.pop(f"{prefix}/scale"))
+    norm.bias.copy_(weights.pop(f"{prefix}/bias"))
 
 
-def load_jax_linear(linear: nn.Linear, weights: dict[str, Tensor], prefix: str) -> None:
-    linear.weight.copy_(weights[f"{prefix}/kernel"].T)
-    linear.bias.copy_(weights[f"{prefix}/bias"])
+def load_flax_linear(linear: nn.Linear, weights: dict[str, Tensor], prefix: str) -> None:
+    linear.weight.copy_(weights.pop(f"{prefix}/kernel").T)
+    linear.bias.copy_(weights.pop(f"{prefix}/bias"))
 
 
-def load_jax_conv2d(conv2d: nn.Conv2d, weights: dict[str, Tensor], prefix: str) -> None:
-    conv2d.weight.copy_(weights[f"{prefix}/kernel"].permute(3, 2, 0, 1))
-    conv2d.bias.copy_(weights[f"{prefix}/bias"])
+def load_flax_conv2d(conv2d: nn.Conv2d, weights: dict[str, Tensor], prefix: str) -> None:
+    conv2d.weight.copy_(weights.pop(f"{prefix}/kernel").permute(3, 2, 0, 1))
+    conv2d.bias.copy_(weights.pop(f"{prefix}/bias"))
 
 
-def load_jax_mha(mha: MHA, weights: dict[str, Tensor], prefix: str) -> None:
-    mha.q_proj.weight.copy_(weights[f"{prefix}/query/kernel"].flatten(1).T)
-    mha.q_proj.bias.copy_(weights[f"{prefix}/query/bias"].flatten())
-    mha.k_proj.weight.copy_(weights[f"{prefix}/key/kernel"].flatten(1).T)
-    mha.k_proj.bias.copy_(weights[f"{prefix}/key/bias"].flatten())
-    mha.v_proj.weight.copy_(weights[f"{prefix}/value/kernel"].flatten(1).T)
-    mha.v_proj.bias.copy_(weights[f"{prefix}/value/bias"].flatten())
-    mha.out_proj.weight.copy_(weights[f"{prefix}/out/kernel"].flatten(0, 1).T)
-    mha.out_proj.bias.copy_(weights[f"{prefix}/out/bias"].flatten())
+def load_flax_mha(mha: MHA, weights: dict[str, Tensor], prefix: str) -> None:
+    mha.q_proj.weight.copy_(weights.pop(f"{prefix}/query/kernel").flatten(1).T)
+    mha.q_proj.bias.copy_(weights.pop(f"{prefix}/query/bias").flatten())
+    mha.k_proj.weight.copy_(weights.pop(f"{prefix}/key/kernel").flatten(1).T)
+    mha.k_proj.bias.copy_(weights.pop(f"{prefix}/key/bias").flatten())
+    mha.v_proj.weight.copy_(weights.pop(f"{prefix}/value/kernel").flatten(1).T)
+    mha.v_proj.bias.copy_(weights.pop(f"{prefix}/value/bias").flatten())
+    mha.out_proj.weight.copy_(weights.pop(f"{prefix}/out/kernel").flatten(0, 1).T)
+    mha.out_proj.bias.copy_(weights.pop(f"{prefix}/out/bias").flatten())

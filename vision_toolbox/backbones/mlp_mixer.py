@@ -10,7 +10,7 @@ import torch
 from torch import Tensor, nn
 
 from ..utils import torch_hub_download
-from .vit import MLP, load_jax_conv2d, load_jax_linear, load_jax_ln
+from .vit import MLP, load_flax_conv2d, load_flax_linear, load_flax_ln
 
 
 class MixerBlock(nn.Module):
@@ -87,14 +87,14 @@ class MLPMixer(nn.Module):
     def load_jax_weights(self, path: str) -> None:
         jax_weights = {k: torch.from_numpy(v) for k, v in np.load(path).items()}
 
-        load_jax_conv2d(self.patch_embed, jax_weights, "stem")
-        load_jax_ln(self.norm, jax_weights, "pre_head_layer_norm")
+        load_flax_conv2d(self.patch_embed, jax_weights, "stem")
+        load_flax_ln(self.norm, jax_weights, "pre_head_layer_norm")
 
         for i, layer in enumerate(self.layers):
-            load_jax_ln(layer.norm1, jax_weights, f"MixerBlock_{i}/LayerNorm_0")
-            load_jax_linear(layer.token_mixing.linear1, jax_weights, f"MixerBlock_{i}/token_mixing/Dense_0")
-            load_jax_linear(layer.token_mixing.linear2, jax_weights, f"MixerBlock_{i}/token_mixing/Dense_1")
+            load_flax_ln(layer.norm1, jax_weights, f"MixerBlock_{i}/LayerNorm_0")
+            load_flax_linear(layer.token_mixing.linear1, jax_weights, f"MixerBlock_{i}/token_mixing/Dense_0")
+            load_flax_linear(layer.token_mixing.linear2, jax_weights, f"MixerBlock_{i}/token_mixing/Dense_1")
 
-            load_jax_ln(layer.norm2, jax_weights, f"MixerBlock_{i}/LayerNorm_1")
-            load_jax_linear(layer.channel_mixing.linear1, jax_weights, f"MixerBlock_{i}/channel_mixing/Dense_0")
-            load_jax_linear(layer.channel_mixing.linear2, jax_weights, f"MixerBlock_{i}/channel_mixing/Dense_1")
+            load_flax_ln(layer.norm2, jax_weights, f"MixerBlock_{i}/LayerNorm_1")
+            load_flax_linear(layer.channel_mixing.linear1, jax_weights, f"MixerBlock_{i}/channel_mixing/Dense_0")
+            load_flax_linear(layer.channel_mixing.linear2, jax_weights, f"MixerBlock_{i}/channel_mixing/Dense_1")
