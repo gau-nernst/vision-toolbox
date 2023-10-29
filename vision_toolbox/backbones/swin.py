@@ -78,7 +78,7 @@ class WindowAttention(MHA):
             attn_bias = attn_bias + self.attn_mask.unsqueeze(1)  # add n_heads dim
 
         x, nH, nW = window_partition(x, self.window_size)  # (B * nH * nW, win_size * win_size, C)
-        x = super().forward(x, attn_bias)
+        x = super().forward(x, attn_bias=attn_bias)
         x = window_unpartition(x, self.window_size, nH, nW)  # (B, H, W, C)
 
         if self.shift > 0:

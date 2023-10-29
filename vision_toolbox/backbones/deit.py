@@ -28,8 +28,8 @@ class DeiT(ViT):
     ) -> None:
         # fmt: off
         super().__init__(
-            d_model, depth, n_heads, patch_size, img_size, True, bias, mlp_ratio,
-            dropout, layer_scale_init, stochastic_depth, norm_eps
+            d_model, depth, n_heads, patch_size, img_size, True, "cls_token", bias,
+            mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm_eps,
         )
         # fmt: on
         self.dist_token = nn.Parameter(torch.zeros(1, 1, d_model))
@@ -133,7 +133,7 @@ class DeiT3(ViT):
     ):
         # fmt: off
         super().__init__(
-            d_model, depth, n_heads, patch_size, img_size, cls_token, bias,
+            d_model, depth, n_heads, patch_size, img_size, cls_token, "cls_token", bias,
             mlp_ratio, dropout, layer_scale_init, stochastic_depth, norm_eps,
         )
         # fmt: on
