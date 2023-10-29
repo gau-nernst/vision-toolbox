@@ -10,7 +10,7 @@ import torch
 from torch import Tensor, nn
 
 from ..utils import torch_hub_download
-from .vit import MLP
+from .vit import MLP, load_jax_conv2d, load_jax_linear, load_jax_ln
 
 
 class MixerBlock(nn.Module):
@@ -84,33 +84,17 @@ class MLPMixer(nn.Module):
         return m
 
     @torch.no_grad()
-    def load_jax_weights(self, path: str) -> MLPMixer:
-        jax_weights: Mapping[str, np.ndarray] = np.load(path)
+    def load_jax_weights(self, path: str) -> None:
+        jax_weights = {k: torch.from_numpy(v) for k, v in np.load(path).items()}
 
-        def get_w(key: str) -> Tensor:
-            return torch.from_numpy(jax_weights[key])
-
-        self.patch_embed.weight.copy_(get_w("stem/kernel").permute(3, 2, 0, 1))
-        self.patch_embed.bias.copy_(get_w("stem/bias"))
+        load_jax_conv2d(self.patch_embed, jax_weights, "stem")
+        load_jax_ln(self.norm, jax_weights, "pre_head_layer_norm")
 
         for i, layer in enumerate(self.layers):
-            layer: MixerBlock
-            prefix = f"MixerBlock_{i}/"
+            load_jax_ln(layer.norm1, jax_weights, f"MixerBlock_{i}/LayerNorm_0")
+            load_jax_linear(layer.token_mixing.linear1, jax_weights, f"MixerBlock_{i}/token_mixing/Dense_0")
+            load_jax_linear(layer.token_mixing.linear2, jax_weights, f"MixerBlock_{i}/token_mixing/Dense_1")
 
-            layer.norm1.weight.copy_(get_w(prefix + "LayerNorm_0/scale"))
-            layer.norm1.bias.copy_(get_w(prefix + "LayerNorm_0/bias"))
-            layer.token_mixing.linear1.weight.copy_(get_w(prefix + "token_mixing/Dense_0/kernel").T)
-            layer.token_mixing.linear1.bias.copy_(get_w(prefix + "token_mixing/Dense_0/bias"))
-            layer.token_mixing.linear2.weight.copy_(get_w(prefix + "token_mixing/Dense_1/kernel").T)
-            layer.token_mixing.linear2.bias.copy_(get_w(prefix + "token_mixing/Dense_1/bias"))
-
-            layer.norm2.weight.copy_(get_w(prefix + "LayerNorm_1/scale"))
-            layer.norm2.bias.copy_(get_w(prefix + "LayerNorm_1/bias"))
-            layer.channel_mixing.linear1.weight.copy_(get_w(prefix + "channel_mixing/Dense_0/kernel").T)
-            layer.channel_mixing.linear1.bias.copy_(get_w(prefix + "channel_mixing/Dense_0/bias"))
-            layer.channel_mixing.linear2.weight.copy_(get_w(prefix + "channel_mixing/Dense_1/kernel").T)
-            layer.channel_mixing.linear2.bias.copy_(get_w(prefix + "channel_mixing/Dense_1/bias"))
-
-        self.norm.weight.copy_(get_w("pre_head_layer_norm/scale"))
-        self.norm.bias.copy_(get_w("pre_head_layer_norm/bias"))
-        return self
+            load_jax_ln(layer.norm2, jax_weights, f"MixerBlock_{i}/LayerNorm_1")
+            load_jax_linear(layer.channel_mixing.linear1, jax_weights, f"MixerBlock_{i}/channel_mixing/Dense_0")
+            load_jax_linear(layer.channel_mixing.linear2, jax_weights, f"MixerBlock_{i}/channel_mixing/Dense_1")
