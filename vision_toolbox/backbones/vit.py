@@ -197,12 +197,11 @@ class ViT(nn.Module):
         load_jax_ln(self.norm, jax_weights, "Transformer/encoder_norm")
 
         for i, layer in enumerate(self.layers):
-            jax_prefix = f"Transformer/encoderblock_{i}"
-            load_jax_ln(layer.mha[0], jax_weights, f"{jax_prefix}/{mha_norm}")
-            load_jax_mha(layer.mha[1], jax_weights, f"{jax_prefix}/{mha}")
-            load_jax_ln(layer.mlp[0], jax_weights, f"{jax_prefix}/{mlp_norm}")
-            load_jax_linear(layer.mlp[1].linear1, jax_weights, f"{jax_prefix}/{mlp}/Dense_0")
-            load_jax_linear(layer.mlp[1].linear2, jax_weights, f"{jax_prefix}/{mlp}/Dense_1")
+            load_jax_ln(layer.mha[0], jax_weights, f"Transformer/encoderblock_{i}/{mha_norm}")
+            load_jax_mha(layer.mha[1], jax_weights, f"Transformer/encoderblock_{i}/{mha}")
+            load_jax_ln(layer.mlp[0], jax_weights, f"Transformer/encoderblock_{i}/{mlp_norm}")
+            load_jax_linear(layer.mlp[1].linear1, jax_weights, f"Transformer/encoderblock_{i}/{mlp}/Dense_0")
+            load_jax_linear(layer.mlp[1].linear2, jax_weights, f"Transformer/encoderblock_{i}/{mlp}/Dense_1")
 
 
 def load_jax_ln(norm: nn.LayerNorm, weights: dict[str, Tensor], prefix: str) -> None:
